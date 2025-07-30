@@ -38,6 +38,7 @@ export interface AppState {
   isLoading: boolean;
   error: string | null;
   fileHistory: HistoryEntry[];
+  isExporting: boolean;
 }
 
 // 历史记录类型
@@ -65,4 +66,14 @@ export interface ExportOptions {
 }
 
 // 任务节点类型映射
-export type TaskNodeType = 'promptBuild' | 'callLLM' | 'httpRequest' | 'codeExec' | 'default'; 
+export type TaskNodeType = 'promptBuild' | 'callLLM' | 'httpRequest' | 'codeExec' | 'default';
+
+// 图片导出选项类型
+export interface ImageExportOptions {
+  format: 'png' | 'jpg' | 'svg';
+  width?: number;
+  height?: number;
+  backgroundColor?: string;
+  filename: string;
+  quality: number; // 0.1 到 1.0，仅对 JPG 有效
+} 

@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useReducer } from 'react';
+import React, { createContext, useContext, useReducer, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AppState, DAGData, HistoryEntry } from '../types';
+import type { AppState, DAGData, HistoryEntry, ImageExportOptions } from '../types';
 import { parseWorkflowToDAG, validateWorkflowData, generateExampleData } from '../utils/dagDataProcessor';
+import { toPng, toJpeg, toSvg } from 'html-to-image';
+import { generateTimestamp } from '../utils/timeUtils';
 
 // 状态操作类型
 type AppAction =
@@ -10,6 +12,7 @@ type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_FILE_HISTORY'; payload: HistoryEntry[] }
+  | { type: 'SET_EXPORTING'; payload: boolean }
   | { type: 'CLEAR_ALL' };
 
 // 初始状态
@@ -18,7 +21,8 @@ const initialState: AppState = {
   jsonText: '',
   isLoading: false,
   error: null,
-  fileHistory: []
+  fileHistory: [],
+  isExporting: false
 };
 
 // Reducer函数
@@ -34,6 +38,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, error: action.payload };
     case 'SET_FILE_HISTORY':
       return { ...state, fileHistory: action.payload };
+    case 'SET_EXPORTING':
+      return { ...state, isExporting: action.payload };
     case 'CLEAR_ALL':
       return { ...initialState };
     default:
@@ -49,9 +55,11 @@ interface AppContextType {
   // 业务逻辑函数
   loadDAGData: (data: any) => Promise<void>;
   exportDAGConfig: () => void;
+  exportImage: (options: ImageExportOptions) => Promise<void>;
   clearCanvas: () => void;
   loadExampleData: () => Promise<void>;
   loadLocalFile: () => Promise<void>;
+  setReactFlowInstance: (instance: any) => void;
 }
 
 // 创建Context
@@ -60,6 +68,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 // Context Provider组件
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
   // 业务逻辑函数
   const loadDAGData = async (data: any) => {
@@ -124,9 +133,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       
+      // 生成当前时间戳作为文件名后缀
+      const timestamp = generateTimestamp();
+      
       const link = document.createElement('a');
       link.href = url;
-      link.download = `dag_workflow_${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `dag_workflow_${timestamp}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -136,6 +148,140 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (error) {
       console.error('导出失败:', error);
       alert('导出失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    }
+  };
+
+  const exportImage = async (options: ImageExportOptions) => {
+    dispatch({ type: 'SET_EXPORTING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+    
+    try {
+      if (!state.dagData) {
+        throw new Error('没有可导出的数据');
+      }
+
+      // 获取 ReactFlow 容器
+      const reactFlowElement = document.querySelector('.react-flow') as HTMLElement;
+      if (!reactFlowElement) {
+        throw new Error('无法找到可视化容器');
+      }
+
+      // 使用存储的ReactFlow实例来调整视图
+      
+      // 临时隐藏Controls和MiniMap组件以获得纯净的图表
+      const controlsElement = document.querySelector('.react-flow__controls') as HTMLElement;
+      const miniMapElement = document.querySelector('.react-flow__minimap') as HTMLElement;
+      
+      // 保存原始显示状态
+      const originalControlsDisplay = controlsElement?.style.display || '';
+      const originalMiniMapDisplay = miniMapElement?.style.display || '';
+      
+      // 隐藏Controls和MiniMap
+      if (controlsElement) controlsElement.style.display = 'none';
+      if (miniMapElement) miniMapElement.style.display = 'none';
+
+      // 调整视图使内容完全居中
+      if (reactFlowInstance && reactFlowInstance.fitView) {
+        // 先进行fitView调整
+        reactFlowInstance.fitView({
+          padding: 0.2, // 20%的边距，确保四周均匀
+          includeHiddenNodes: false,
+          duration: 0
+        });
+        
+        // 等待更长时间确保视图调整完成
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 再次调用fitView确保居中
+        reactFlowInstance.fitView({
+          padding: 0.2,
+          includeHiddenNodes: false,
+          duration: 0
+        });
+        
+        // 再等待一段时间确保第二次调整生效
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // 强制触发重新渲染
+        const viewport = reactFlowInstance.getViewport();
+        console.log('导出前的视口信息:', viewport);
+        
+        // 如果有setViewport方法，使用当前视口重新设置以强制渲染
+        if (reactFlowInstance.setViewport) {
+          reactFlowInstance.setViewport(viewport, { duration: 0 });
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      try {
+        let dataUrl: string;
+        const exportOptions = {
+          width: options.width,
+          height: options.height,
+          backgroundColor: options.backgroundColor === 'transparent' ? undefined : options.backgroundColor,
+          // 添加过滤器，只捕获主要内容，排除UI控制元素
+          filter: (node: HTMLElement) => {
+            // 排除Controls和MiniMap相关的元素
+            if (node.classList && (
+              node.classList.contains('react-flow__controls') ||
+              node.classList.contains('react-flow__minimap') ||
+              node.classList.contains('react-flow__attribution')
+            )) {
+              return false;
+            }
+            return true;
+          },
+          // 添加其他选项确保正确捕获
+          useCORS: true,
+          allowTaint: true,
+          // 确保捕获当前视图状态
+          skipAutoScale: true
+        };
+
+        // 根据格式调用不同的导出函数
+        switch (options.format) {
+          case 'png':
+            dataUrl = await toPng(reactFlowElement, exportOptions);
+            break;
+          case 'jpg':
+            dataUrl = await toJpeg(reactFlowElement, {
+              ...exportOptions,
+              quality: options.quality,
+              backgroundColor: options.backgroundColor || '#ffffff', // JPG 不支持透明
+            });
+            break;
+          case 'svg':
+            dataUrl = await toSvg(reactFlowElement, {
+              width: options.width,
+              height: options.height,
+              filter: exportOptions.filter,
+            });
+            break;
+          default:
+            throw new Error(`不支持的导出格式: ${options.format}`);
+        }
+
+        // 下载文件
+        const link = document.createElement('a');
+        link.download = `${options.filename}.${options.format}`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log(`图片已导出: ${options.filename}.${options.format}`);
+      } finally {
+        // 恢复Controls和MiniMap的显示状态
+        if (controlsElement) controlsElement.style.display = originalControlsDisplay;
+        if (miniMapElement) miniMapElement.style.display = originalMiniMapDisplay;
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '图片导出失败';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      console.error('图片导出错误:', error);
+      throw error; // 重新抛出错误，让调用者处理
+    } finally {
+      dispatch({ type: 'SET_EXPORTING', payload: false });
     }
   };
 
@@ -235,9 +381,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch,
     loadDAGData,
     exportDAGConfig,
+    exportImage,
     clearCanvas,
     loadExampleData,
-    loadLocalFile
+    loadLocalFile,
+    setReactFlowInstance: (instance: any) => setReactFlowInstance(instance)
   };
 
   return (

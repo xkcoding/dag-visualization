@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   NodeFactory, 
-  ColorManager,
   DEFAULT_NODE_TYPES 
 } from '../utils/nodeTypeManager';
 import type { 
-  NodeTypeDefinition, 
   NodeCreationConfig
 } from '../utils/nodeTypeManager';
 

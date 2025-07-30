@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import ImageExportDialog from './ImageExportDialog';
+import type { ExportOptions } from './ImageExportDialog';
 
 const Toolbar: React.FC = () => {
-  const { loadExampleData, loadLocalFile, exportDAGConfig, clearCanvas, state } = useApp();
+  const { loadExampleData, loadLocalFile, exportDAGConfig, exportImage, clearCanvas, state } = useApp();
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   const handleLoadLocalFile = async () => {
     try {
@@ -29,6 +32,20 @@ const Toolbar: React.FC = () => {
       clearCanvas();
     } else if (!state.dagData) {
       clearCanvas(); // 如果没有数据就直接清空
+    }
+  };
+
+  const handleExportImage = () => {
+    setIsExportDialogOpen(true);
+  };
+
+  const handleImageExport = async (options: ExportOptions) => {
+    try {
+      await exportImage(options);
+      setIsExportDialogOpen(false);
+    } catch (error) {
+      // 错误已经在 AppContext 中处理了，这里不需要额外处理
+      console.error('图片导出失败:', error);
     }
   };
 
@@ -78,6 +95,16 @@ const Toolbar: React.FC = () => {
             </button>
             
             <button 
+              className="toolbar-btn"
+              onClick={handleExportImage}
+              disabled={state.isLoading || !state.dagData}
+              title="导出图片 (Ctrl+E)"
+            >
+              <span className="btn-icon">📸</span>
+              导出图片
+            </button>
+            
+            <button 
               className="toolbar-btn danger"
               onClick={handleClearCanvas}
               disabled={state.isLoading}
@@ -95,6 +122,13 @@ const Toolbar: React.FC = () => {
           </div>
         )}
       </div>
+      
+      <ImageExportDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        onExport={handleImageExport}
+        isExporting={state.isExporting}
+      />
     </div>
   );
 };

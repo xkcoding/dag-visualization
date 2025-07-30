@@ -145,17 +145,18 @@ export class NodeFactory {
     let nodeTypeDef = DEFAULT_NODE_TYPES.find(type => type.id === config.nodeType);
     
     // 如果没有找到预定义类型，创建自定义类型定义
-    if (!nodeTypeDef && config.customProperties?.isCustomType) {
+    if (!nodeTypeDef && config.customProperties?.isCustomType && config.customProperties.customNodeType) {
+      const customType = config.customProperties.customNodeType;
       nodeTypeDef = {
-        id: config.customProperties.customNodeType,
-        label: config.customProperties.customNodeType,
+        id: customType,
+        label: customType,
         description: '自定义节点',
         icon: '⚙️', // 自定义类型使用固定图标
         defaultColor: '#64748b',
         className: 'node-custom',
         template: {
-          taskType: config.customProperties.customNodeType,
-          '@type': `custom.node.${config.customProperties.customNodeType}`,
+          taskType: customType,
+          '@type': `custom.node.${customType}`,
           input: [],
           output: [],
           dependencies: []

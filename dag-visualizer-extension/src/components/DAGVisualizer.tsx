@@ -8,21 +8,27 @@ import ReactFlow, {
   MarkerType,
   useReactFlow,
   addEdge,
-  applyNodeChanges,
   ConnectionLineType
 } from 'reactflow';
-import type { Node, Edge, Connection, NodeChange } from 'reactflow';
+import type { Node, Edge, Connection } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useApp } from '../context/AppContext';
 import NodeCreationDialog from './NodeCreationDialog';
-import { DEFAULT_NODE_TYPES, NodeFactory, ColorManager } from '../utils/nodeTypeManager';
+import { DEFAULT_NODE_TYPES } from '../utils/nodeTypeManager';
 import type { NodeTypeDefinition } from '../utils/nodeTypeManager';
 
 const DAGVisualizer: React.FC = () => {
-  const { state, dispatch, loadDAGData } = useApp();
+  const { state, dispatch, loadDAGData, setReactFlowInstance } = useApp();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const reactFlowInstance = useReactFlow();
+
+  // 将ReactFlow实例传递给AppContext
+  React.useEffect(() => {
+    if (reactFlowInstance) {
+      setReactFlowInstance(reactFlowInstance);
+    }
+  }, [reactFlowInstance, setReactFlowInstance]);
 
   // 节点创建对话框状态
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -167,7 +173,7 @@ const DAGVisualizer: React.FC = () => {
   }, [state.jsonText, dispatch, loadDAGData]);
 
   // 处理边选中事件
-  const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+  const onEdgeClick = useCallback((event: React.MouseEvent, _edge: Edge) => {
     event.stopPropagation();
     // 显示删除提示
     if (!showDeleteHint) {
@@ -484,11 +490,6 @@ const DAGVisualizer: React.FC = () => {
     // 关闭菜单
     setContextMenuPosition(null);
   }, [setNodes, state.jsonText, dispatch, loadDAGData]);
-
-  // 关闭右键菜单
-  const closeContextMenu = useCallback(() => {
-    setContextMenuPosition(null);
-  }, []);
 
   // 打开节点创建对话框
   const openNodeCreationDialog = useCallback(() => {
