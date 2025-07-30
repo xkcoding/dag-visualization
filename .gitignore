@@ -47,3 +47,7 @@ dag-visualizer-extension/.web-extension-id
 # Temporary files
 *.tmp
 *.temp 
+
+.history/
+
+*.zip
