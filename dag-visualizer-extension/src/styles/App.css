@@ -135,7 +135,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 12px 16px; /* 减少上下padding */
   background: #fafafa;
   border-bottom: 1px solid #e0e0e0;
   font-weight: 600;
@@ -144,27 +144,71 @@
 
 .input-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px; /* 减少按钮间距 */
 }
 
-.paste-btn, .file-input-label {
+.paste-btn, .file-input-label, .format-btn {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 4px 8px; /* 减少按钮padding */
   background: #1976d2;
   color: white;
   border: none;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px; /* 减小按钮字体 */
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
-.paste-btn:hover, .file-input-label:hover {
+.paste-btn:hover, .file-input-label:hover, .format-btn:hover {
   background: #1565c0;
 }
 
+.format-btn {
+  background: #4caf50;
+}
+
+.format-btn:hover {
+  background: #43a047;
+}
+
+/* Monaco Editor容器 */
+.editor-container {
+  flex: 1;
+  display: flex; /* 添加flex布局 */
+  flex-direction: column; /* 垂直布局 */
+  margin: 8px; /* 减少左右间距 */
+  border: none; /* 移除边框 */
+  border-radius: 0; /* 移除圆角 */
+  overflow: hidden;
+  background: #ffffff;
+  transition: border-color 0.2s;
+  min-height: 0; /* 允许flex收缩 */
+}
+
+.editor-container:focus-within {
+  /* 移除聚焦时的边框变化 */
+}
+
+.editor-container.error {
+  /* 保留错误状态的视觉提示，但用背景色而不是边框 */
+  background: #fff5f5;
+}
+
+/* Monaco Editor加载状态 */
+.editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1; /* 占满容器 */
+  background: #ffffff;
+  color: #333333;
+  font-size: 12px; /* 减小加载文字大小 */
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+/* 兼容性：保留原有textarea样式以防需要降级 */
 .json-editor {
   flex: 1;
   margin: 16px 20px;
@@ -204,10 +248,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: 8px 16px; /* 减少上下padding */
   background: #fafafa;
   border-top: 1px solid #e0e0e0;
-  font-size: 12px;
+  font-size: 11px; /* 减小字体 */
 }
 
 .status.valid {
