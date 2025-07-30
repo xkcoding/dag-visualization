@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔗 DAG工作流可视化器 - 独立版本</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f7fa;
+            color: #262626;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #1890ff;
+            margin: 0 0 10px 0;
+            font-size: 2rem;
+        }
+        
+        .header p {
+            color: #8c8c8c;
+            margin: 0 0 20px 0;
+        }
+        
+        .controls {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .controls h2 {
+            margin-top: 0;
+            color: #262626;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .btn:hover {
+            background: #40a9ff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(24,144,255,0.3);
+        }
+        
+        .btn-secondary {
+            background: #52c41a;
+        }
+        
+        .btn-secondary:hover {
+            background: #73d13d;
+        }
+        
+        .btn-warning {
+            background: #faad14;
+        }
+        
+        .btn-warning:hover {
+            background: #ffc53d;
+        }
+        
+        .canvas-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 400px;
+            position: relative;
+        }
+        
+        .status {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        
+        .status-success {
+            background: #f6ffed;
+            color: #52c41a;
+            border: 1px solid #b7eb8f;
+        }
+        
+        .status-error {
+            background: #fff2f0;
+            color: #ff4d4f;
+            border: 1px solid #ffccc7;
+        }
+        
+        .status-info {
+            background: #e6f7ff;
+            color: #1890ff;
+            border: 1px solid #91d5ff;
+        }
+        
+        .file-drop-zone {
+            border: 2px dashed #d9d9d9;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: #8c8c8c;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .file-drop-zone:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+            background: #f6f8fa;
+        }
+        
+        .file-drop-zone.dragover {
+            border-color: #52c41a;
+            background: #f6ffed;
+            color: #52c41a;
+        }
+        
+        #file-input {
+            display: none;
+        }
+        
+        #dag-canvas {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #f0f0f0;
+            border-radius: 6px;
+        }
+        
+        .node {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .node:hover {
+            filter: brightness(1.1);
+            stroke-width: 3;
+        }
+        
+        .node.selected {
+            stroke: #ff4d4f;
+            stroke-width: 3;
+        }
+        
+        .edge {
+            stroke: #595959;
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+        
+        .edge.highlighted {
+            stroke: #ff4d4f;
+            stroke-width: 3;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+        
+        .alert-warning {
+            background: #fffbe6;
+            border-color: #faad14;
+            color: #d48806;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 DAG工作流可视化器</h1>
+            <p>独立版本 - 无需Tampermonkey，直接在浏览器中运行</p>
+            <div class="status status-info">
+                ✅ 页面已加载，可以开始使用！这是Tampermonkey的完美替代方案。
+            </div>
+        </div>
+
+        <div class="alert alert-warning">
+            <strong>💡 使用说明：</strong> 
+            这是独立的HTML版本，不依赖任何浏览器扩展。您可以将此文件保存到本地，随时双击打开使用。
+            支持所有原有功能：文件上传、节点可视化、交互选择等。
+        </div>
+
+        <div class="controls">
+            <h2>📁 文件操作</h2>
+            
+            <div class="btn-group">
+                <button class="btn" onclick="triggerFileUpload()">📁 选择JSON文件</button>
+                <button class="btn btn-secondary" onclick="loadSampleData()">🧪 加载示例数据</button>
+                <button class="btn btn-warning" onclick="exportConfig()">💾 导出配置</button>
+                <button class="btn" onclick="clearCanvas()">🗑️ 清空画布</button>
+            </div>
+            
+            <input type="file" id="file-input" accept=".json" onchange="handleFileUpload(event)">
+            
+            <div class="file-drop-zone" onclick="triggerFileUpload()" 
+                 ondrop="handleFileDrop(event)" 
+                 ondragover="handleDragOver(event)"
+                 ondragleave="handleDragLeave(event)">
+                📁 点击选择文件 或 拖拽JSON文件到此处
+            </div>
+            
+            <div id="status-message" class="status status-info">
+                准备就绪 - 请上传JSON文件开始可视化
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <h2>🎨 DAG可视化画布</h2>
+            <svg id="dag-canvas" viewBox="0 0 1000 500">
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                            refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#595959" />
+                    </marker>
+                    <marker id="arrowhead-highlight" markerWidth="10" markerHeight="7" 
+                            refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#ff4d4f" />
+                    </marker>
+                </defs>
+                
+                <g id="edges-group"></g>
+                <g id="nodes-group"></g>
+                
+                <text x="500" y="250" text-anchor="middle" fill="#8c8c8c" font-size="18">
+                    请上传JSON文件开始可视化
+                </text>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let nodes = [];
+        let edges = [];
+        let selectedNode = null;
+
+        // 节点类型配置
+        const nodeTypes = {
+            'PROMPT_BUILD': { color: '#52c41a', textColor: '#ffffff' },
+            'CALL_LLM': { color: '#faad14', textColor: '#000000' },
+            'HTTP_REQUEST': { color: '#ff4d4f', textColor: '#ffffff' },
+            'CODE_EXEC': { color: '#722ed1', textColor: '#ffffff' },
+            'UNKNOWN': { color: '#8c8c8c', textColor: '#ffffff' }
+        };
+
+        // 更新状态信息
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status-message');
+            statusElement.className = `status status-${type}`;
+            statusElement.textContent = message;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // 触发文件选择
+        function triggerFileUpload() {
+            document.getElementById('file-input').click();
+        }
+
+        // 处理文件上传
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.name.endsWith('.json')) {
+                updateStatus('❌ 请选择JSON格式文件', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    loadDAGData(jsonData, file.name);
+                } catch (error) {
+                    updateStatus('❌ JSON文件解析失败: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // 处理拖拽
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('dragover');
+        }
+
+        function handleFileDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                const fakeEvent = { target: { files: [files[0]] } };
+                handleFileUpload(fakeEvent);
+            }
+        }
+
+        // 加载DAG数据
+        function loadDAGData(jsonData, filename) {
+            updateStatus('⏳ 正在解析DAG数据...', 'info');
+
+            try {
+                const parsedData = parseDAGJson(jsonData);
+                nodes = parsedData.nodes;
+                edges = parsedData.edges;
+
+                if (nodes.length === 0) {
+                    updateStatus('❌ 未找到有效的DAG节点数据', 'error');
+                    return;
+                }
+
+                calculateLayout();
+                renderDAG();
+                
+                updateStatus(
+                    `✅ 成功加载 ${filename} - ${nodes.length}个节点，${edges.length}条连线`, 
+                    'success'
+                );
+                
+            } catch (error) {
+                updateStatus('❌ 数据处理失败: ' + error.message, 'error');
+                console.error('DAG数据加载错误:', error);
+            }
+        }
+
+        // 解析JSON数据
+        function parseDAGJson(jsonData) {
+            const parsedNodes = [];
+            const parsedEdges = [];
+            
+            const tasks = Array.isArray(jsonData) ? jsonData : (jsonData.tasks || []);
+            
+            tasks.forEach((task, index) => {
+                if (!task || typeof task !== 'object') return;
+                
+                const nodeType = extractNodeType(task['@type'] || task.type || 'UNKNOWN');
+                const nodeId = task.taskId || `node_${index}`;
+                
+                parsedNodes.push({
+                    id: nodeId,
+                    type: nodeType,
+                    label: nodeType,
+                    x: 0, 
+                    y: 0
+                });
+                
+                const dependencies = task.dependencies || [];
+                dependencies.forEach(dep => {
+                    if (dep && typeof dep === 'string') {
+                        parsedEdges.push({
+                            source: dep,
+                            target: nodeId
+                        });
+                    }
+                });
+            });
+            
+            return { nodes: parsedNodes, edges: parsedEdges };
+        }
+
+        // 提取节点类型
+        function extractNodeType(typeString) {
+            if (!typeString) return 'UNKNOWN';
+            
+            const type = typeString.toLowerCase();
+            if (type.includes('templatetransform') || type.includes('prompt_build')) return 'PROMPT_BUILD';
+            if (type.includes('llm') || type.includes('call_llm')) return 'CALL_LLM';
+            if (type.includes('httprequest') || type.includes('http_request')) return 'HTTP_REQUEST';
+            if (type.includes('code') || type.includes('exec')) return 'CODE_EXEC';
+            
+            return 'UNKNOWN';
+        }
+
+        // 计算布局
+        function calculateLayout() {
+            // 简单网格布局
+            const cols = Math.ceil(Math.sqrt(nodes.length));
+            const nodeWidth = 120;
+            const nodeHeight = 60;
+            const spacingX = 150;
+            const spacingY = 80;
+            
+            nodes.forEach((node, index) => {
+                const col = index % cols;
+                const row = Math.floor(index / cols);
+                node.x = 100 + col * spacingX;
+                node.y = 50 + row * spacingY;
+            });
+        }
+
+        // 渲染DAG
+        function renderDAG() {
+            const svg = document.getElementById('dag-canvas');
+            const nodesGroup = document.getElementById('nodes-group');
+            const edgesGroup = document.getElementById('edges-group');
+            
+            // 清空现有内容
+            nodesGroup.innerHTML = '';
+            edgesGroup.innerHTML = '';
+            
+            // 渲染连线
+            edges.forEach(edge => {
+                const sourceNode = nodes.find(n => n.id === edge.source);
+                const targetNode = nodes.find(n => n.id === edge.target);
+                
+                if (sourceNode && targetNode) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('class', 'edge');
+                    line.setAttribute('x1', sourceNode.x + 60);
+                    line.setAttribute('y1', sourceNode.y);
+                    line.setAttribute('x2', targetNode.x - 60);
+                    line.setAttribute('y2', targetNode.y);
+                    line.setAttribute('data-source', edge.source);
+                    line.setAttribute('data-target', edge.target);
+                    edgesGroup.appendChild(line);
+                }
+            });
+            
+            // 渲染节点
+            nodes.forEach(node => {
+                const nodeConfig = nodeTypes[node.type] || nodeTypes['UNKNOWN'];
+                
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('class', 'node');
+                g.setAttribute('data-id', node.id);
+                g.style.cursor = 'pointer';
+                
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', node.x - 60);
+                rect.setAttribute('y', node.y - 20);
+                rect.setAttribute('width', 120);
+                rect.setAttribute('height', 40);
+                rect.setAttribute('rx', 8);
+                rect.setAttribute('fill', nodeConfig.color);
+                rect.setAttribute('stroke', darkenColor(nodeConfig.color, 20));
+                rect.setAttribute('stroke-width', 2);
+                
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', node.x);
+                text.setAttribute('y', node.y);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('fill', nodeConfig.textColor);
+                text.setAttribute('font-size', '12');
+                text.setAttribute('font-weight', 'bold');
+                text.textContent = node.type;
+                
+                g.appendChild(rect);
+                g.appendChild(text);
+                
+                // 添加点击事件
+                g.addEventListener('click', () => selectNode(node.id));
+                
+                nodesGroup.appendChild(g);
+            });
+            
+            // 调整SVG视图框
+            if (nodes.length > 0) {
+                const maxX = Math.max(...nodes.map(n => n.x)) + 100;
+                const maxY = Math.max(...nodes.map(n => n.y)) + 50;
+                svg.setAttribute('viewBox', `0 0 ${maxX} ${maxY}`);
+            }
+        }
+
+        // 选择节点
+        function selectNode(nodeId) {
+            // 清除选择
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+            document.querySelectorAll('.edge').forEach(e => e.classList.remove('highlighted'));
+            
+            // 选择新节点
+            const nodeElement = document.querySelector(`[data-id="${nodeId}"]`);
+            if (nodeElement) {
+                nodeElement.classList.add('selected');
+                selectedNode = nodeId;
+                
+                // 高亮相关连线
+                document.querySelectorAll(`[data-source="${nodeId}"], [data-target="${nodeId}"]`).forEach(edge => {
+                    edge.classList.add('highlighted');
+                    edge.setAttribute('marker-end', 'url(#arrowhead-highlight)');
+                });
+                
+                updateStatus(`🎯 已选中节点: ${nodeId}`, 'info');
+            }
+        }
+
+        // 加载示例数据
+        function loadSampleData() {
+            const sampleData = [
+                {
+                    "@type": "com.xiaohongshu.data.aimi.workflow.nodes.TemplateTransformNode",
+                    "taskId": "PROMPT_BUILD_1",
+                    "taskType": "PROMPT_BUILD",
+                    "dependencies": []
+                },
+                {
+                    "@type": "com.xiaohongshu.data.aimi.workflow.nodes.LLMNode",
+                    "taskId": "CALL_LLM_1", 
+                    "taskType": "CALL_LLM",
+                    "dependencies": ["PROMPT_BUILD_1"]
+                },
+                {
+                    "@type": "com.xiaohongshu.data.aimi.workflow.nodes.HttpRequestNode",
+                    "taskId": "HTTP_REQUEST_1",
+                    "taskType": "HTTP_REQUEST", 
+                    "dependencies": ["CALL_LLM_1"]
+                },
+                {
+                    "@type": "com.xiaohongshu.data.aimi.workflow.nodes.CodeNode",
+                    "taskId": "CODE_EXEC_1",
+                    "taskType": "CODE_EXEC",
+                    "dependencies": ["HTTP_REQUEST_1"]
+                }
+            ];
+            
+            loadDAGData(sampleData, 'sample-data.json');
+        }
+
+        // 导出配置
+        function exportConfig() {
+            if (nodes.length === 0) {
+                updateStatus('❌ 没有可导出的数据', 'error');
+                return;
+            }
+
+            const exportData = nodes.map(node => ({
+                '@type': `com.example.${node.type}`,
+                'taskId': node.id,
+                'taskType': node.type,
+                'dependencies': edges.filter(e => e.target === node.id).map(e => e.source),
+                'input': [],
+                'output': [],
+                '_visualization': {
+                    'position': { x: node.x, y: node.y },
+                    'layout': 'grid',
+                    'lastUpdated': new Date().toISOString()
+                }
+            }));
+
+            const jsonString = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `dag-config-exported-${new Date().getTime()}.json`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+            updateStatus(`✅ 配置已导出 - ${nodes.length}个节点`, 'success');
+        }
+
+        // 清空画布
+        function clearCanvas() {
+            nodes = [];
+            edges = [];
+            selectedNode = null;
+            
+            document.getElementById('nodes-group').innerHTML = '';
+            document.getElementById('edges-group').innerHTML = '';
+            
+            // 恢复默认提示
+            const svg = document.getElementById('dag-canvas');
+            svg.setAttribute('viewBox', '0 0 1000 500');
+            
+            const defaultText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            defaultText.setAttribute('x', '500');
+            defaultText.setAttribute('y', '250');
+            defaultText.setAttribute('text-anchor', 'middle');
+            defaultText.setAttribute('fill', '#8c8c8c');
+            defaultText.setAttribute('font-size', '18');
+            defaultText.textContent = '请上传JSON文件开始可视化';
+            
+            document.getElementById('nodes-group').appendChild(defaultText);
+            updateStatus('🗑️ 画布已清空', 'info');
+        }
+
+        // 颜色处理工具函数
+        function darkenColor(hex, percent) {
+            const num = parseInt(hex.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = (num >> 16) - amt;
+            const G = (num >> 8 & 0x00FF) - amt;
+            const B = (num & 0x0000FF) - amt;
+            return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+        }
+
+        // 页面加载完成提示
+        console.log(`
+🔗 DAG工作流可视化器 - 独立版本
+
+✨ 功能特性：
+• 📁 文件上传和拖拽支持
+• 🎨 实时DAG可视化渲染
+• 🎯 节点选择和路径高亮
+• 💾 配置导出功能
+• 🧪 示例数据测试
+
+🚀 无需任何浏览器扩展，开箱即用！
+        `);
+    </script>
+</body>
+</html> 

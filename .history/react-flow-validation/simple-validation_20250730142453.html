@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Flow 简单验证</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .flow-wrapper {
+            width: 100%;
+            height: 500px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 2px solid #e1e5e9;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        button {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #40a9ff;
+        }
+        
+        .status {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+        }
+        
+        .status.success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+        .status.error { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+        .status.info { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+        
+        h1 { color: #262626; margin: 0; }
+        h3 { color: #8c8c8c; margin: 5px 0; font-weight: normal; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 React Flow 简单验证</h1>
+            <h3>直接验证 React Flow 在浏览器环境中的功能</h3>
+        </div>
+        
+        <div id="reactflow-container" class="flow-wrapper">
+            <!-- React Flow 在这里渲染 -->
+        </div>
+        
+        <div class="controls">
+            <button onclick="testSimpleFlow()">测试简单流程</button>
+            <button onclick="testComplexDAG()">测试复杂 DAG</button>
+            <button onclick="testInteractions()">测试交互功能</button>
+            <button onclick="clearCanvas()">清空画布</button>
+            
+            <div id="status" class="status info">
+                正在加载 React Flow...
+            </div>
+        </div>
+    </div>
+
+    <!-- React 通过 CDN 加载 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- React Flow 通过 CDN 加载 -->
+    <script src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
+    
+    <script>
+        // 等待所有资源加载完成
+        window.addEventListener('load', function() {
+            initializeReactFlow();
+        });
+        
+        let flowInstance = null;
+        
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function initializeReactFlow() {
+            // 检查依赖
+            if (typeof React === 'undefined') {
+                updateStatus('❌ React 未加载', 'error');
+                return;
+            }
+            
+            if (typeof ReactFlow === 'undefined') {
+                updateStatus('❌ React Flow 未加载', 'error');
+                return;
+            }
+            
+            updateStatus('✅ React 和 React Flow 加载成功，开始初始化...', 'success');
+            
+            // 创建 React Flow 应用
+            const { useState, useCallback } = React;
+            
+            function FlowApp() {
+                const [nodes, setNodes] = useState([]);
+                const [edges, setEdges] = useState([]);
+                
+                const onNodesChange = useCallback((changes) => {
+                    setNodes((nds) => ReactFlow.applyNodeChanges(changes, nds));
+                }, []);
+                
+                const onEdgesChange = useCallback((changes) => {
+                    setEdges((eds) => ReactFlow.applyEdgeChanges(changes, eds));
+                }, []);
+                
+                const onConnect = useCallback((connection) => {
+                    setEdges((eds) => ReactFlow.addEdge(connection, eds));
+                }, []);
+                
+                return React.createElement(ReactFlow.ReactFlow, {
+                    nodes: nodes,
+                    edges: edges,
+                    onNodesChange: onNodesChange,
+                    onEdgesChange: onEdgesChange,
+                    onConnect: onConnect,
+                    fitView: true,
+                    onInit: (instance) => {
+                        flowInstance = instance;
+                        updateStatus('✅ React Flow 初始化成功！', 'success');
+                        // 自动加载测试数据
+                        setTimeout(() => testSimpleFlow(), 1000);
+                    },
+                    style: { width: '100%', height: '100%' }
+                }, [
+                    React.createElement(ReactFlow.Controls),
+                    React.createElement(ReactFlow.MiniMap),
+                    React.createElement(ReactFlow.Background, { variant: 'dots' })
+                ]);
+            }
+            
+            // 渲染应用
+            const container = document.getElementById('reactflow-container');
+            const root = ReactDOM.createRoot(container);
+            root.render(React.createElement(FlowApp));
+        }
+        
+        function testSimpleFlow() {
+            if (!flowInstance) {
+                updateStatus('❌ Flow 实例未初始化', 'error');
+                return;
+            }
+            
+            const simpleNodes = [
+                {
+                    id: '1',
+                    type: 'input',
+                    position: { x: 100, y: 100 },
+                    data: { label: 'PROMPT BUILD' },
+                    style: { background: '#52c41a', color: 'white', border: '2px solid #389e0d' }
+                },
+                {
+                    id: '2',
+                    position: { x: 300, y: 100 },
+                    data: { label: 'CALL LLM' },
+                    style: { background: '#faad14', color: '#000', border: '2px solid #d48806' }
+                },
+                {
+                    id: '3',
+                    position: { x: 500, y: 100 },
+                    data: { label: 'HTTP REQUEST' },
+                    style: { background: '#ff4d4f', color: 'white', border: '2px solid #cf1322' }
+                },
+                {
+                    id: '4',
+                    type: 'output',
+                    position: { x: 700, y: 100 },
+                    data: { label: 'CODE EXEC' },
+                    style: { background: '#722ed1', color: 'white', border: '2px solid #531dab' }
+                }
+            ];
+            
+            const simpleEdges = [
+                { id: 'e1-2', source: '1', target: '2', animated: true },
+                { id: 'e2-3', source: '2', target: '3', animated: true },
+                { id: 'e3-4', source: '3', target: '4', animated: true }
+            ];
+            
+            flowInstance.setNodes(simpleNodes);
+            flowInstance.setEdges(simpleEdges);
+            
+            setTimeout(() => {
+                flowInstance.fitView();
+                updateStatus('✅ 简单流程加载完成 - 4个节点', 'success');
+            }, 100);
+        }
+        
+        function testComplexDAG() {
+            if (!flowInstance) {
+                updateStatus('❌ Flow 实例未初始化', 'error');
+                return;
+            }
+            
+            // 29个节点的复杂 DAG
+            const complexNodes = [];
+            const complexEdges = [];
+            
+            // 生成节点
+            const nodeTypes = ['PROMPT_BUILD', 'CALL_LLM', 'HTTP_REQUEST', 'CODE_EXEC'];
+            const nodeColors = ['#52c41a', '#faad14', '#ff4d4f', '#722ed1'];
+            
+            for (let i = 1; i <= 29; i++) {
+                const typeIndex = (i - 1) % 4;
+                complexNodes.push({
+                    id: `node${i}`,
+                    position: { 
+                        x: ((i - 1) % 7) * 160 + 50, 
+                        y: Math.floor((i - 1) / 7) * 100 + 50 
+                    },
+                    data: { label: `${nodeTypes[typeIndex]}\n${i}` },
+                    style: { 
+                        background: nodeColors[typeIndex], 
+                        color: typeIndex === 1 ? '#000' : 'white',
+                        border: '2px solid #333',
+                        fontSize: '11px',
+                        textAlign: 'center'
+                    }
+                });
+            }
+            
+            // 生成边（模拟依赖关系）
+            for (let i = 1; i < 29; i++) {
+                if (i % 7 !== 0) { // 水平连接
+                    complexEdges.push({
+                        id: `e${i}-${i+1}`,
+                        source: `node${i}`,
+                        target: `node${i+1}`
+                    });
+                }
+                if (i <= 22) { // 垂直连接
+                    complexEdges.push({
+                        id: `e${i}-${i+7}`,
+                        source: `node${i}`,
+                        target: `node${i+7}`
+                    });
+                }
+            }
+            
+            flowInstance.setNodes(complexNodes);
+            flowInstance.setEdges(complexEdges);
+            
+            setTimeout(() => {
+                flowInstance.fitView();
+                updateStatus('✅ 复杂 DAG 加载完成 - 29个节点', 'success');
+            }, 100);
+        }
+        
+        function testInteractions() {
+            updateStatus('🎮 交互测试：尝试拖拽节点、缩放画布、点击控制器', 'info');
+            
+            // 模拟节点选择测试
+            if (flowInstance) {
+                const nodes = flowInstance.getNodes();
+                if (nodes.length > 0) {
+                    // 选择第一个节点
+                    const updatedNodes = nodes.map((node, index) => ({
+                        ...node,
+                        selected: index === 0
+                    }));
+                    flowInstance.setNodes(updatedNodes);
+                    
+                    setTimeout(() => {
+                        // 取消选择
+                        const resetNodes = nodes.map(node => ({
+                            ...node,
+                            selected: false
+                        }));
+                        flowInstance.setNodes(resetNodes);
+                        updateStatus('✅ 交互功能正常', 'success');
+                    }, 2000);
+                }
+            }
+        }
+        
+        function clearCanvas() {
+            if (!flowInstance) {
+                updateStatus('❌ Flow 实例未初始化', 'error');
+                return;
+            }
+            
+            flowInstance.setNodes([]);
+            flowInstance.setEdges([]);
+            updateStatus('🧹 画布已清空', 'info');
+        }
+    </script>
+</body>
+</html> 

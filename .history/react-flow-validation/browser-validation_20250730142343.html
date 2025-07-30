@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Flow DAG 可视化验证</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+        }
+        
+        .validation-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .flow-container {
+            width: 100%;
+            height: 600px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #e1e5e9;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        button {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #40a9ff;
+            transform: translateY(-1px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .status-item {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status-success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+        .status-warning { background: #fffbe6; color: #faad14; border: 1px solid #ffe58f; }
+        .status-error { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+        
+        .validation-info {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            border-left: 4px solid #1890ff;
+        }
+        
+        h1 { color: #262626; margin: 0; }
+        h2 { color: #595959; margin: 0 0 10px 0; }
+        h3 { color: #8c8c8c; margin: 5px 0; font-weight: normal; }
+    </style>
+</head>
+<body>
+    <div class="validation-container">
+        <div class="header">
+            <h1>🔍 React Flow DAG 可视化技术验证</h1>
+            <h3>验证 React Flow 在浏览器环境中的可行性 - 无需本地服务器</h3>
+        </div>
+        
+        <div id="dag-flow-container" class="flow-container">
+            <!-- React Flow 将在这里渲染 -->
+        </div>
+        
+        <div class="controls">
+            <h2>🎮 验证控制</h2>
+            <div class="control-group">
+                <button onclick="loadSimpleDAG()">加载简单 DAG</button>
+                <button onclick="loadRealDAG()">加载真实数据 DAG</button>
+                <button onclick="testLayoutAlgorithms()">测试布局算法</button>
+                <button onclick="testInteraction()">测试交互功能</button>
+                <button onclick="clearFlow()">清空画布</button>
+            </div>
+            
+            <div class="status" id="status-container">
+                <!-- 状态信息将在这里显示 -->
+            </div>
+            
+            <div class="validation-info">
+                <strong>📊 验证目标：</strong>
+                <ul>
+                    <li>React Flow 库通过 CDN 正确加载</li>
+                    <li>DAG 节点和边的正确渲染</li>
+                    <li>节点类型样式差异化显示</li>
+                    <li>用户交互功能（拖拽、缩放、选择）</li>
+                    <li>布局算法的应用和效果</li>
+                    <li>真实数据（29节点）的性能表现</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- React 通过 CDN 加载 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- React Flow 通过 CDN 加载 -->
+    <script src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
+    
+    <!-- 验证脚本 -->
+    <script src="dag-flow-validator.js"></script>
+</body>
+</html> 

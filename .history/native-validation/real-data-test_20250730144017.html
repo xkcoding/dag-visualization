@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>真实数据 DAG 验证</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .svg-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow: auto;
+            height: 600px;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #40a9ff;
+            transform: translateY(-1px);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-label {
+            background: #52c41a;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+        
+        .file-label:hover {
+            background: #73d13d;
+            transform: translateY(-1px);
+        }
+        
+        .status {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            border: 1px solid;
+        }
+        
+        .status.success {
+            background: #f6ffed;
+            color: #52c41a;
+            border-color: #b7eb8f;
+        }
+        
+        .status.error {
+            background: #fff2f0;
+            color: #ff4d4f;
+            border-color: #ffccc7;
+        }
+        
+        .status.info {
+            background: #e6f7ff;
+            color: #1890ff;
+            border-color: #91d5ff;
+        }
+        
+        /* SVG 样式 */
+        .dag-node {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .dag-node:hover {
+            filter: brightness(1.1);
+            stroke-width: 3;
+        }
+        
+        .dag-node.selected {
+            stroke: #ff4d4f;
+            stroke-width: 3;
+        }
+        
+        .node-prompt {
+            fill: #52c41a;
+            stroke: #389e0d;
+        }
+        
+        .node-llm {
+            fill: #faad14;
+            stroke: #d48806;
+        }
+        
+        .node-http {
+            fill: #ff4d4f;
+            stroke: #cf1322;
+        }
+        
+        .node-code {
+            fill: #722ed1;
+            stroke: #531dab;
+        }
+        
+        .node-text {
+            fill: white;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            font-size: 10px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        
+        .node-text.dark {
+            fill: #000;
+        }
+        
+        .dag-edge {
+            stroke: #595959;
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+        
+        .dag-edge.highlighted {
+            stroke: #ff4d4f;
+            stroke-width: 3;
+        }
+        
+        h1 {
+            color: #262626;
+            margin: 0;
+        }
+        
+        h3 {
+            color: #8c8c8c;
+            margin: 5px 0;
+            font-weight: normal;
+        }
+        
+        .stats {
+            background: #f0f2f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .info-panel {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 真实数据 DAG 验证</h1>
+            <h3>加载 dag-question-rewrite-rerank.json 文件进行可视化验证</h3>
+            <div class="stats" id="stats">
+                等待加载数据...
+            </div>
+        </div>
+        
+        <div class="svg-container">
+            <svg id="dag-svg" width="100%" height="550" viewBox="0 0 1200 550">
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                            refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#595959" />
+                    </marker>
+                </defs>
+                
+                <g id="edges-group"></g>
+                <g id="nodes-group"></g>
+            </svg>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="file-input" class="file-label">📁 加载 JSON 文件</label>
+                <input type="file" id="file-input" class="file-input" accept=".json" onchange="loadJSONFile(event)">
+                <button onclick="loadFromParent()">🔗 加载父目录数据</button>
+                <button onclick="testLayouts()">📐 切换布局</button>
+                <button onclick="exportData()">💾 导出配置</button>
+                <button onclick="clearCanvas()">🧹 清空</button>
+            </div>
+            
+            <div id="status" class="status info">
+                请选择 dag-question-rewrite-rerank.json 文件或点击"加载父目录数据"
+            </div>
+            
+            <div class="info-panel" id="node-info" style="display: none;">
+                <strong>节点信息:</strong>
+                <div id="node-details"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class RealDataDAG {
+            constructor(svgId) {
+                this.svg = document.getElementById(svgId);
+                this.nodesGroup = document.getElementById('nodes-group');
+                this.edgesGroup = document.getElementById('edges-group');
+                this.nodes = [];
+                this.edges = [];
+                this.selectedNode = null;
+                this.rawData = null;
+                
+                this.nodeTypes = {
+                    'PROMPT_BUILD': { class: 'node-prompt', textClass: 'node-text' },
+                    'CALL_LLM': { class: 'node-llm', textClass: 'node-text dark' },
+                    'HTTP_REQUEST': { class: 'node-http', textClass: 'node-text' },
+                    'CODE_EXEC': { class: 'node-code', textClass: 'node-text' }
+                };
+            }
+            
+            // 解析真实的 DAG JSON 数据
+            parseRealDAGJson(dagData) {
+                this.rawData = dagData;
+                const nodes = [];
+                const edges = [];
+                
+                console.log('解析 DAG 数据:', dagData);
+                
+                if (dagData.tasks) {
+                    dagData.tasks.forEach((task, index) => {
+                        const nodeType = this.extractNodeType(task['@type']);
+                        const nodeId = task.taskId || `task_${index}`;
+                        
+                        nodes.push({
+                            id: nodeId,
+                            type: nodeType,
+                            label: `${nodeType}`,
+                            taskType: task.taskType,
+                            atType: task['@type'],
+                            originalTask: task,
+                            x: 0, y: 0
+                        });
+                        
+                        // 解析依赖关系
+                        if (task.dependencies && Array.isArray(task.dependencies)) {
+                            task.dependencies.forEach(dep => {
+                                edges.push({
+                                    source: dep,
+                                    target: nodeId
+                                });
+                            });
+                        }
+                    });
+                }
+                
+                console.log(`解析完成: ${nodes.length} 个节点, ${edges.length} 条边`);
+                return { nodes, edges };
+            }
+            
+            extractNodeType(atType) {
+                if (atType.includes('TemplateTransform')) return 'PROMPT_BUILD';
+                if (atType.includes('LLM')) return 'CALL_LLM';
+                if (atType.includes('HttpRequest')) return 'HTTP_REQUEST';
+                if (atType.includes('Code')) return 'CODE_EXEC';
+                return 'UNKNOWN';
+            }
+            
+            // 改进的层次布局算法
+            calculateHierarchicalLayout(nodes, edges) {
+                if (nodes.length === 0) return nodes;
+                
+                // 计算入度
+                const inDegree = {};
+                const outEdges = {};
+                nodes.forEach(node => {
+                    inDegree[node.id] = 0;
+                    outEdges[node.id] = [];
+                });
+                
+                edges.forEach(edge => {
+                    if (inDegree[edge.target] !== undefined) {
+                        inDegree[edge.target]++;
+                    }
+                    if (outEdges[edge.source]) {
+                        outEdges[edge.source].push(edge.target);
+                    }
+                });
+                
+                // 分层
+                const layers = [];
+                let currentLayer = nodes.filter(node => inDegree[node.id] === 0);
+                const processed = new Set();
+                
+                while (currentLayer.length > 0) {
+                    layers.push([...currentLayer]);
+                    currentLayer.forEach(node => processed.add(node.id));
+                    
+                    const nextLayer = [];
+                    currentLayer.forEach(node => {
+                        outEdges[node.id].forEach(targetId => {
+                            inDegree[targetId]--;
+                            if (inDegree[targetId] === 0 && !processed.has(targetId)) {
+                                const targetNode = nodes.find(n => n.id === targetId);
+                                if (targetNode && !nextLayer.includes(targetNode)) {
+                                    nextLayer.push(targetNode);
+                                }
+                            }
+                        });
+                    });
+                    
+                    currentLayer = nextLayer;
+                }
+                
+                // 处理剩余节点（可能有循环依赖）
+                const remaining = nodes.filter(node => !processed.has(node.id));
+                if (remaining.length > 0) {
+                    layers.push(remaining);
+                }
+                
+                // 应用布局
+                const spacingX = 140;
+                const spacingY = 80;
+                const startX = 70;
+                const startY = 50;
+                
+                layers.forEach((layer, layerIndex) => {
+                    layer.forEach((node, nodeIndex) => {
+                        node.x = startX + layerIndex * spacingX;
+                        node.y = startY + nodeIndex * spacingY;
+                    });
+                });
+                
+                return nodes;
+            }
+            
+            // 网格布局
+            calculateGridLayout(nodes) {
+                const cols = Math.ceil(Math.sqrt(nodes.length));
+                const spacingX = 140;
+                const spacingY = 80;
+                
+                nodes.forEach((node, index) => {
+                    const col = index % cols;
+                    const row = Math.floor(index / cols);
+                    node.x = 70 + col * spacingX;
+                    node.y = 50 + row * spacingY;
+                });
+                
+                return nodes;
+            }
+            
+            // 渲染节点
+            renderNodes() {
+                this.nodesGroup.innerHTML = '';
+                
+                this.nodes.forEach(node => {
+                    const nodeConfig = this.nodeTypes[node.type] || this.nodeTypes['UNKNOWN'];
+                    
+                    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    g.setAttribute('class', 'dag-node');
+                    g.setAttribute('data-id', node.id);
+                    
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', node.x - 60);
+                    rect.setAttribute('y', node.y - 25);
+                    rect.setAttribute('width', 120);
+                    rect.setAttribute('height', 50);
+                    rect.setAttribute('rx', 8);
+                    rect.setAttribute('class', nodeConfig.class);
+                    rect.setAttribute('stroke-width', 2);
+                    
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', node.x);
+                    text.setAttribute('y', node.y - 5);
+                    text.setAttribute('class', nodeConfig.textClass);
+                    text.textContent = node.type;
+                    
+                    const idText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    idText.setAttribute('x', node.x);
+                    idText.setAttribute('y', node.y + 10);
+                    idText.setAttribute('class', nodeConfig.textClass);
+                    idText.setAttribute('font-size', '8');
+                    idText.textContent = node.id.length > 12 ? node.id.substring(0, 12) + '...' : node.id;
+                    
+                    g.addEventListener('click', () => this.selectNode(node.id));
+                    
+                    g.appendChild(rect);
+                    g.appendChild(text);
+                    g.appendChild(idText);
+                    this.nodesGroup.appendChild(g);
+                });
+            }
+            
+            // 渲染连线
+            renderEdges() {
+                this.edgesGroup.innerHTML = '';
+                
+                this.edges.forEach(edge => {
+                    const sourceNode = this.nodes.find(n => n.id === edge.source);
+                    const targetNode = this.nodes.find(n => n.id === edge.target);
+                    
+                    if (sourceNode && targetNode) {
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        
+                        // 计算连线路径
+                        const startX = sourceNode.x + 60;
+                        const startY = sourceNode.y;
+                        const endX = targetNode.x - 60;
+                        const endY = targetNode.y;
+                        
+                        // 使用贝塞尔曲线使连线更美观
+                        const midX = (startX + endX) / 2;
+                        const d = `M ${startX} ${startY} Q ${midX} ${startY} ${endX} ${endY}`;
+                        
+                        path.setAttribute('d', d);
+                        path.setAttribute('class', 'dag-edge');
+                        path.setAttribute('data-source', edge.source);
+                        path.setAttribute('data-target', edge.target);
+                        
+                        this.edgesGroup.appendChild(path);
+                    }
+                });
+            }
+            
+            // 选择节点并显示详细信息
+            selectNode(nodeId) {
+                // 取消之前的选择
+                document.querySelectorAll('.dag-node').forEach(node => {
+                    node.classList.remove('selected');
+                });
+                
+                document.querySelectorAll('.dag-edge').forEach(edge => {
+                    edge.classList.remove('highlighted');
+                });
+                
+                // 选择新节点
+                const nodeElement = document.querySelector(`[data-id="${nodeId}"]`);
+                const nodeData = this.nodes.find(n => n.id === nodeId);
+                
+                if (nodeElement && nodeData) {
+                    nodeElement.classList.add('selected');
+                    this.selectedNode = nodeId;
+                    
+                    // 高亮相关连线
+                    document.querySelectorAll(`[data-source="${nodeId}"], [data-target="${nodeId}"]`).forEach(edge => {
+                        edge.classList.add('highlighted');
+                    });
+                    
+                    // 显示节点详细信息
+                    this.showNodeInfo(nodeData);
+                    
+                    updateStatus(`已选中节点: ${nodeId}`, 'info');
+                }
+            }
+            
+            showNodeInfo(nodeData) {
+                const infoPanel = document.getElementById('node-info');
+                const detailsDiv = document.getElementById('node-details');
+                
+                const task = nodeData.originalTask;
+                const dependencies = task.dependencies || [];
+                const dependents = this.edges.filter(e => e.source === nodeData.id).map(e => e.target);
+                
+                detailsDiv.innerHTML = `
+                    <strong>ID:</strong> ${nodeData.id}<br>
+                    <strong>类型:</strong> ${nodeData.type}<br>
+                    <strong>任务类型:</strong> ${nodeData.taskType || 'N/A'}<br>
+                    <strong>原始类型:</strong> ${nodeData.atType}<br>
+                    <strong>依赖数量:</strong> ${dependencies.length}<br>
+                    <strong>被依赖数量:</strong> ${dependents.length}<br>
+                    ${dependencies.length > 0 ? `<strong>依赖:</strong> ${dependencies.join(', ')}<br>` : ''}
+                    ${dependents.length > 0 ? `<strong>被依赖:</strong> ${dependents.join(', ')}<br>` : ''}
+                `;
+                
+                infoPanel.style.display = 'block';
+            }
+            
+            loadData(nodes, edges, layoutType = 'hierarchical') {
+                this.nodes = nodes;
+                this.edges = edges;
+                
+                if (layoutType === 'hierarchical') {
+                    this.calculateHierarchicalLayout(this.nodes, this.edges);
+                } else {
+                    this.calculateGridLayout(this.nodes);
+                }
+                
+                this.render();
+                this.updateStats();
+            }
+            
+            render() {
+                this.renderNodes();
+                this.renderEdges();
+            }
+            
+            clear() {
+                this.nodes = [];
+                this.edges = [];
+                this.rawData = null;
+                this.nodesGroup.innerHTML = '';
+                this.edgesGroup.innerHTML = '';
+                this.selectedNode = null;
+                document.getElementById('node-info').style.display = 'none';
+                this.updateStats();
+            }
+            
+            updateStats() {
+                const stats = document.getElementById('stats');
+                stats.textContent = `节点: ${this.nodes.length} | 连线: ${this.edges.length} | 代码: ~4KB | 性能: 原生渲染`;
+            }
+            
+            exportConfiguration() {
+                if (!this.rawData) {
+                    return null;
+                }
+                
+                const config = {
+                    metadata: {
+                        exportTime: new Date().toISOString(),
+                        totalNodes: this.nodes.length,
+                        totalEdges: this.edges.length
+                    },
+                    nodes: this.nodes.map(node => ({
+                        id: node.id,
+                        type: node.type,
+                        position: { x: node.x, y: node.y },
+                        taskType: node.taskType,
+                        atType: node.atType
+                    })),
+                    edges: this.edges,
+                    originalData: this.rawData
+                };
+                
+                return config;
+            }
+        }
+        
+        // 全局变量
+        let dag = null;
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            dag = new RealDataDAG('dag-svg');
+            updateStatus('真实数据 DAG 验证器初始化完成', 'success');
+        });
+        
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        // 加载 JSON 文件
+        function loadJSONFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            updateStatus('正在读取文件...', 'info');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    const { nodes, edges } = dag.parseRealDAGJson(jsonData);
+                    dag.loadData(nodes, edges, 'hierarchical');
+                    updateStatus(`文件加载成功: ${nodes.length} 个节点, ${edges.length} 条边`, 'success');
+                } catch (error) {
+                    updateStatus(`文件解析失败: ${error.message}`, 'error');
+                    console.error('JSON 解析错误:', error);
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // 尝试加载父目录的数据文件
+        async function loadFromParent() {
+            updateStatus('正在尝试加载父目录数据...', 'info');
+            
+            try {
+                const response = await fetch('../dag-question-rewrite-rerank.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const jsonData = await response.json();
+                const { nodes, edges } = dag.parseRealDAGJson(jsonData);
+                dag.loadData(nodes, edges, 'hierarchical');
+                updateStatus(`数据加载成功: ${nodes.length} 个节点, ${edges.length} 条边`, 'success');
+            } catch (error) {
+                updateStatus(`无法加载父目录数据: ${error.message}`, 'error');
+                console.error('数据加载错误:', error);
+            }
+        }
+        
+        function testLayouts() {
+            if (dag.nodes.length === 0) {
+                updateStatus('请先加载数据', 'error');
+                return;
+            }
+            
+            const currentIsHierarchical = dag.nodes[0].x % 140 === 70;
+            
+            if (currentIsHierarchical) {
+                dag.calculateGridLayout(dag.nodes);
+                updateStatus('已切换到网格布局', 'info');
+            } else {
+                dag.calculateHierarchicalLayout(dag.nodes, dag.edges);
+                updateStatus('已切换到层次布局', 'info');
+            }
+            
+            dag.render();
+        }
+        
+        function exportData() {
+            const config = dag.exportConfiguration();
+            if (!config) {
+                updateStatus('没有数据可导出', 'error');
+                return;
+            }
+            
+            const dataStr = JSON.stringify(config, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'dag-visualization-config.json';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            updateStatus('配置已导出', 'success');
+        }
+        
+        function clearCanvas() {
+            dag.clear();
+            updateStatus('画布已清空', 'info');
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" fill="#40a9ff" rx="16"/>
+  <g fill="white">
+    <!-- DAG节点 -->
+    <circle cx="32" cy="40" r="8"/>
+    <circle cx="64" cy="32" r="8"/>
+    <circle cx="96" cy="40" r="8"/>
+    <circle cx="48" cy="72" r="8"/>
+    <circle cx="80" cy="72" r="8"/>
+    <circle cx="64" cy="96" r="8"/>
+    
+    <!-- 连接线 -->
+    <path d="M32 48 L48 64" stroke="white" stroke-width="2" fill="none"/>
+    <path d="M64 40 L48 64" stroke="white" stroke-width="2" fill="none"/>
+    <path d="M64 40 L80 64" stroke="white" stroke-width="2" fill="none"/>
+    <path d="M96 48 L80 64" stroke="white" stroke-width="2" fill="none"/>
+    <path d="M48 80 L64 88" stroke="white" stroke-width="2" fill="none"/>
+    <path d="M80 80 L64 88" stroke="white" stroke-width="2" fill="none"/>
+  </g>
+  
+  <!-- 文字 -->
+  <text x="64" y="118" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">DAG</text>
+</svg> 
