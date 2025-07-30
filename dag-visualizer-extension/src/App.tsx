@@ -1,4 +1,5 @@
 import React from 'react';
+import { ReactFlowProvider } from 'reactflow';
 import { AppProvider } from './context/AppContext';
 import Toolbar from './components/Toolbar';
 import JSONInputArea from './components/JSONInputArea';
@@ -14,7 +15,9 @@ const App: React.FC = () => {
         <div className="app-container">
           <Toolbar />
           <JSONInputArea />
-          <DAGVisualizer />
+          <ReactFlowProvider>
+            <DAGVisualizer />
+          </ReactFlowProvider>
           <StatusBar />
         </div>
       </AppProvider>

@@ -4,10 +4,12 @@ import type { DAGData, DAGNode, DAGEdge, TaskNodeType } from '../types';
 interface WorkflowNode {
   taskId: string;
   taskType: string;
-  '@type': string;
+  '@type'?: string;
   dependencies?: string[];
   input?: Array<{ fieldName: string; path?: string; value?: any }>;
   output?: Array<{ fieldName: string; path: string; required?: boolean }>;
+  color?: string; // 新增：用于存储自定义节点的颜色
+  isCustomType?: boolean; // 新增：用于标识是否为自定义类型
 }
 
 // 获取节点类型样式
@@ -140,19 +142,29 @@ export function parseWorkflowToDAG(jsonData: any): DAGData {
       const nodeType = getSimplifiedNodeType(node.taskType);
       const position = positions[node.taskId] || { x: 0, y: index * 100 };
       
+      // 获取节点颜色，优先使用存储的颜色，否则使用类型默认颜色
+      const nodeColor = node.color || getNodeTypeColor(node.taskType);
+      
       return {
         id: node.taskId,
         type: nodeType,
-        label: node.taskId.replace(/_/g, ' '),
+        label: node.taskId, // 直接使用taskId作为显示名称
         data: {
           original: node,
           index: index,
           taskType: node.taskType,
-          color: getNodeTypeColor(node.taskType),
+          color: nodeColor,
           inputCount: node.input?.length || 0,
-          outputCount: node.output?.length || 0
+          outputCount: node.output?.length || 0,
+          // 支持自定义类型的额外信息
+          isCustomType: node.isCustomType || false
         },
-        position
+        position,
+        style: {
+          backgroundColor: nodeColor,
+          border: `2px solid ${nodeColor}`,
+          borderRadius: '8px'
+        }
       };
     });
 
