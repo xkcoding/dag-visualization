@@ -29,6 +29,15 @@ import {
   DEFAULT_ALIGNMENT_OPTIONS
 } from '../utils/layoutUtils';
 import type { LayoutOptions, AlignmentOptions } from '../utils/layoutUtils';
+import {
+  calculateUniformNodeSize,
+  DEFAULT_NODE_TEXT_CONFIG
+} from '../utils/textUtils';
+import {
+  optimizeEdges,
+  DEFAULT_EDGE_OPTIMIZATION_OPTIONS
+} from '../utils/edgeOptimization';
+import type { EdgeOptimizationOptions } from '../utils/edgeOptimization';
 
 const DAGVisualizer: React.FC = () => {
   const { state, dispatch, loadDAGData, setReactFlowInstance } = useApp();
@@ -69,56 +78,200 @@ const DAGVisualizer: React.FC = () => {
   // 使用ref来存储智能布局函数，避免依赖循环
   const smartLayoutRef = useRef<(() => void) | null>(null);
 
+  // 文本自适应布局状态 (T=固定, U=统一)
+  const [textAdaptiveMode, setTextAdaptiveMode] = useState<'uniform' | 'fixed'>('fixed');
+  const textConfig = DEFAULT_NODE_TEXT_CONFIG; // 使用默认配置
+
+  // 连线重叠优化状态
+  const [edgeOptimizationOptions, setEdgeOptimizationOptions] = useState<EdgeOptimizationOptions>(DEFAULT_EDGE_OPTIMIZATION_OPTIONS);
+
+  // 连线选中和节点高亮状态
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
+
   // 当DAG数据变化时更新节点和边
   React.useEffect(() => {
     if (state.dagData) {
-      const reactFlowNodes: Node[] = state.dagData.nodes.map(node => ({
-        id: node.id,
-        type: 'default',
-        position: node.position,
-        data: { 
-          label: node.label,
-          original: node.data.original,
-          taskType: node.data.taskType,
-          inputCount: node.data.inputCount,
-          outputCount: node.data.outputCount
-        },
-        style: {
-          backgroundColor: node.data.color || '#ffffff',
-          color: '#ffffff',
-          border: '2px solid #ffffff',
-          borderRadius: '8px',
-          fontSize: '12px',
-          fontWeight: 'bold',
-          minWidth: '180px',
-          minHeight: '40px',
-          padding: '8px'
-        },
-        sourcePosition: layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
-        targetPosition: layoutOptions.direction === 'LR' ? Position.Left : Position.Top
-      }));
+      const reactFlowNodes: Node[] = state.dagData.nodes.map(node => {
+        return {
+          id: node.id,
+          type: 'default',
+          position: node.position, // 数据加载时使用原始位置
+          data: { 
+            label: node.label,
+            original: node.data.original,
+            taskType: node.data.taskType,
+            inputCount: node.data.inputCount,
+            outputCount: node.data.outputCount
+          },
+          style: {
+            backgroundColor: node.data.color || '#ffffff',
+            color: '#ffffff',
+            border: '2px solid #ffffff',
+            borderRadius: '8px',
+            fontSize: '11px', // 默认字体大小，文本模式会单独处理
+            fontWeight: 'bold',
+            width: '180px', // 默认尺寸，文本模式会单独处理
+            height: '40px',
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            whiteSpace: 'nowrap' as const, // 默认不换行，文本模式会单独处理
+            wordBreak: 'normal' as const,
+            overflow: 'hidden',
+            lineHeight: '1.2',
+            transition: 'all 0.3s ease'
+          },
+          sourcePosition: layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
+          targetPosition: layoutOptions.direction === 'LR' ? Position.Left : Position.Top
+        };
+      });
       
-      const reactFlowEdges: Edge[] = state.dagData.edges.map(edge => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        type: 'smoothstep',
-        animated: true,
-        style: { stroke: '#94a3b8', strokeWidth: 2 },
-        sourcePosition: layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
-        targetPosition: layoutOptions.direction === 'LR' ? Position.Left : Position.Top,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: '#94a3b8',
-          width: 16,
-          height: 16,
-        }
-      }));
+      let reactFlowEdges: Edge[] = state.dagData.edges.map(edge => {
+        return {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: 'smoothstep',
+          animated: true,
+          style: { 
+            stroke: '#94a3b8', // 默认颜色，高亮状态单独处理
+            strokeWidth: 2, // 默认宽度
+            opacity: 0.8
+          },
+          sourcePosition: layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
+          targetPosition: layoutOptions.direction === 'LR' ? Position.Left : Position.Top,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#94a3b8', // 默认箭头颜色
+            width: 16,
+            height: 16,
+          }
+        };
+      });
+
+      // 应用连线重叠优化
+      if (edgeOptimizationOptions.enabled && reactFlowNodes.length > 0) {
+        reactFlowEdges = optimizeEdges(
+          reactFlowEdges,
+          reactFlowNodes,
+          layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
+          layoutOptions.direction === 'LR' ? Position.Left : Position.Top,
+          edgeOptimizationOptions
+        );
+      }
 
       setNodes(reactFlowNodes);
       setEdges(reactFlowEdges);
     }
-  }, [state.dagData, setNodes, setEdges, layoutOptions.direction]);
+  }, [state.dagData, setNodes, setEdges, layoutOptions.direction, edgeOptimizationOptions]);
+
+  // 使用ref来跟踪上次的textAdaptiveMode，避免无限循环
+  const lastTextModeRef = useRef<'uniform' | 'fixed'>('fixed');
+
+  // 文本模式变化时，只更新节点样式，保持位置不变 - 使用函数式更新
+  React.useEffect(() => {
+    // 只有当textAdaptiveMode真正改变时才更新
+    if (lastTextModeRef.current !== textAdaptiveMode) {
+      lastTextModeRef.current = textAdaptiveMode;
+      
+      setNodes(prevNodes => {
+        if (prevNodes.length === 0) return prevNodes;
+        
+        // 计算节点尺寸（根据文本自适应模式）
+        let uniformSize: { width: number; height: number; fontSize: number } | null = null;
+        if (textAdaptiveMode === 'uniform' && state.dagData) {
+          const allTexts = state.dagData.nodes.map(node => node.label);
+          uniformSize = calculateUniformNodeSize(allTexts, textConfig);
+        }
+
+        return prevNodes.map(node => {
+          let nodeSize = { width: 180, height: 40, fontSize: 11 };
+          
+          if (textAdaptiveMode === 'uniform' && uniformSize) {
+            nodeSize = uniformSize;
+          }
+
+          return {
+            ...node,
+            style: {
+              ...node.style,
+              fontSize: `${nodeSize.fontSize}px`,
+              width: textAdaptiveMode === 'fixed' ? '180px' : `${nodeSize.width}px`,
+              height: textAdaptiveMode === 'fixed' ? '40px' : `${nodeSize.height}px`,
+              whiteSpace: textAdaptiveMode === 'fixed' ? 'nowrap' as const : 'pre-wrap' as const,
+              wordBreak: textAdaptiveMode === 'fixed' ? 'normal' as const : 'break-word' as const,
+            }
+          };
+        });
+      });
+    }
+  }, [textAdaptiveMode, setNodes, state.dagData]);
+
+  // 单独处理节点高亮状态更新 - 使用函数式更新避免依赖冲突
+  React.useEffect(() => {
+    setNodes(prevNodes => {
+      if (prevNodes.length === 0) return prevNodes;
+      
+      return prevNodes.map(node => {
+        const isHighlighted = highlightedNodes.has(node.id);
+        const currentlyHighlighted = node.style?.border === '3px solid #fbbf24';
+        
+        // 只有状态真正改变时才更新
+        if (isHighlighted === currentlyHighlighted) {
+          return node;
+        }
+        
+        return {
+          ...node,
+          // 明确保持原始位置不变
+          position: node.position,
+          style: {
+            ...node.style,
+            border: isHighlighted ? '3px solid #fbbf24' : '2px solid #ffffff',
+            boxShadow: isHighlighted ? '0 0 20px rgba(251, 191, 36, 0.6)' : undefined
+            // 移除 transform 和 zIndex 避免影响交互
+          }
+        };
+      });
+    });
+  }, [highlightedNodes, setNodes]);
+
+  // 单独处理边的高亮状态更新
+  React.useEffect(() => {
+    setEdges(prevEdges => {
+      if (prevEdges.length === 0) return prevEdges;
+      
+      return prevEdges.map(edge => {
+        const isSelected = selectedEdge === edge.id;
+        const currentlySelected = edge.style?.stroke === '#fbbf24';
+        
+        // 只有状态真正改变时才更新
+        if (isSelected === currentlySelected) {
+          return edge;
+        }
+        
+        return {
+          ...edge,
+          style: {
+            ...edge.style,
+            stroke: isSelected ? '#fbbf24' : '#94a3b8',
+            strokeWidth: isSelected ? 4 : 2,
+            opacity: isSelected ? 1 : 0.8,
+            filter: isSelected ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.8))' : undefined
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isSelected ? '#fbbf24' : '#94a3b8',
+            width: 16,
+            height: 16,
+          }
+        };
+      });
+    });
+  }, [selectedEdge, setEdges]);
 
 
 
@@ -201,15 +354,7 @@ const DAGVisualizer: React.FC = () => {
     }
   }, [state.jsonText, dispatch, loadDAGData]);
 
-  // 处理边选中事件
-  const onEdgeClick = useCallback((event: React.MouseEvent, _edge: Edge) => {
-    event.stopPropagation();
-    // 显示删除提示
-    if (!showDeleteHint) {
-      setShowDeleteHint(true);
-      setTimeout(() => setShowDeleteHint(false), 3000);
-    }
-  }, [showDeleteHint]);
+
 
   // 处理连线
   const onConnect = useCallback((connection: Connection) => {
@@ -643,14 +788,73 @@ const DAGVisualizer: React.FC = () => {
     console.log(`网格对齐: ${alignmentOptions.snapToGrid ? '关闭' : '开启'}`);
   }, [alignmentOptions.snapToGrid]);
 
+  // 切换文本自适应模式 (T/U)
+  const toggleTextAdaptiveMode = useCallback(() => {
+    console.log(`文本模式切换前: 布局方向=${layoutOptions.direction}, 文本模式=${textAdaptiveMode}`);
+    
+    const modes: Array<'fixed' | 'uniform'> = ['fixed', 'uniform'];
+    const currentIndex = modes.indexOf(textAdaptiveMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    const nextMode = modes[nextIndex];
+    
+    setTextAdaptiveMode(nextMode);
+    
+    const modeNames = {
+      'fixed': 'T (固定尺寸)',
+      'uniform': 'U (统一尺寸)'
+    };
+    
+    console.log(`文本布局模式切换为: ${modeNames[nextMode]}`);
+    
+    // 延迟检查布局方向是否被意外改变
+    setTimeout(() => {
+      console.log(`文本模式切换后: 布局方向=${layoutOptions.direction}, 文本模式=${nextMode}`);
+    }, 50);
+  }, [textAdaptiveMode, layoutOptions.direction]);
+
+  // 切换连线重叠优化
+  const toggleEdgeOptimization = useCallback(() => {
+    setEdgeOptimizationOptions(prev => ({
+      ...prev,
+      enabled: !prev.enabled
+    }));
+    
+    console.log(`连线重叠优化: ${edgeOptimizationOptions.enabled ? '关闭' : '开启'}`);
+  }, [edgeOptimizationOptions.enabled]);
+
+  // 连线点击事件处理
+  const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.stopPropagation();
+    console.log(`点击连线: ${edge.id}, 起点: ${edge.source}, 终点: ${edge.target}`);
+    
+    // 显示删除提示
+    if (!showDeleteHint) {
+      setShowDeleteHint(true);
+      setTimeout(() => setShowDeleteHint(false), 3000);
+    }
+    
+    if (selectedEdge === edge.id) {
+      // 取消选中
+      setSelectedEdge(null);
+      setHighlightedNodes(new Set());
+    } else {
+      // 选中新连线
+      setSelectedEdge(edge.id);
+      setHighlightedNodes(new Set([edge.source, edge.target]));
+    }
+  }, [selectedEdge, showDeleteHint]);
+
   // 关闭节点创建对话框
   const closeNodeCreationDialog = useCallback(() => {
     setIsDialogOpen(false);
   }, []);
 
-  // 点击画布时关闭右键菜单
+  // 点击画布时关闭右键菜单和取消连线选中
   const handlePaneClick = useCallback(() => {
     setContextMenuPosition(null);
+    // 取消连线选中
+    setSelectedEdge(null);
+    setHighlightedNodes(new Set());
   }, []);
 
   return (
@@ -674,7 +878,7 @@ const DAGVisualizer: React.FC = () => {
           onNodeDoubleClick={onNodeDoubleClick}
           onConnect={onConnect}
           onEdgesDelete={onEdgesDelete}
-          onEdgeClick={onEdgeClick}
+          onEdgeClick={handleEdgeClick}
           connectionLineType={layoutOptions.direction === 'LR' ? ConnectionLineType.Straight : ConnectionLineType.SmoothStep}
           connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
           connectionMode={ConnectionMode.Loose}
@@ -730,6 +934,32 @@ const DAGVisualizer: React.FC = () => {
               }}
             >
               {alignmentOptions.snapToGrid ? '⊞' : '⊡'}
+            </ControlButton>
+            
+            {/* 文本自适应模式切换按钮 */}
+            <ControlButton
+              onClick={toggleTextAdaptiveMode}
+              title={`文本布局: ${
+                textAdaptiveMode === 'fixed' ? 'T (固定尺寸)' : 'U (统一尺寸)'
+              }`}
+              style={{
+                backgroundColor: textAdaptiveMode !== 'fixed' ? '#2196F3' : undefined,
+                color: textAdaptiveMode !== 'fixed' ? 'white' : undefined
+              }}
+            >
+              {textAdaptiveMode === 'fixed' ? 'T' : 'U'}
+            </ControlButton>
+            
+            {/* 连线重叠优化开关按钮 */}
+            <ControlButton
+              onClick={toggleEdgeOptimization}
+              title={`连线重叠优化: ${edgeOptimizationOptions.enabled ? '开启' : '关闭'}`}
+              style={{
+                backgroundColor: edgeOptimizationOptions.enabled ? '#9C27B0' : undefined,
+                color: edgeOptimizationOptions.enabled ? 'white' : undefined
+              }}
+            >
+              {edgeOptimizationOptions.enabled ? '⧬' : '⧭'}
             </ControlButton>
           </Controls>
           <MiniMap 

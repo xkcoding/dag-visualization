@@ -1,0 +1,51 @@
+[
+    {
+      "@type": "com.example.workflow.nodes.StartNode",
+      "taskId": "START_NODE",
+      "taskType": "START",
+      "input": [],
+      "output": [],
+      "dependencies": []
+    },
+    {
+      "@type": "com.example.workflow.nodes.ProcessNode",
+      "taskId": "DATA_PROCESSING",
+      "taskType": "PROMPT_BUILD",
+      "input": [],
+      "output": [],
+      "dependencies": [
+        "START_NODE"
+      ]
+    },
+    {
+      "@type": "com.example.workflow.nodes.LLMNode",
+      "taskId": "AI_ANALYSIS",
+      "taskType": "CALL_LLM",
+      "input": [],
+      "output": [],
+      "dependencies": [
+        "DATA_PROCESSING"
+      ]
+    },
+    {
+      "@type": "com.example.workflow.nodes.HttpNode",
+      "taskId": "API_CALL",
+      "taskType": "HttpRequestNode",
+      "input": [],
+      "output": [],
+      "dependencies": [
+        "AI_ANALYSIS",
+        "START_NODE"
+      ]
+    },
+    {
+      "@type": "com.example.workflow.nodes.EndNode",
+      "taskId": "END_NODE",
+      "taskType": "CodeNode",
+      "input": [],
+      "output": [],
+      "dependencies": [
+        "API_CALL"
+      ]
+    }
+  ]
