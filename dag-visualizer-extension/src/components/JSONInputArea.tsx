@@ -1,8 +1,15 @@
 import React, { useState, useCallback, useRef } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor, { loader } from '@monaco-editor/react';
 import { useApp } from '../context/AppContext';
 import { validateWorkflowData } from '../utils/dagDataProcessor';
 import ConfirmDialog from './ConfirmDialog';
+
+// 配置Monaco Editor使用本地资源
+loader.config({
+  paths: {
+    vs: '/monaco-editor/min/vs'
+  }
+});
 
 const JSONInputArea: React.FC = () => {
   const { state, dispatch, loadDAGData, clearCanvas } = useApp();
