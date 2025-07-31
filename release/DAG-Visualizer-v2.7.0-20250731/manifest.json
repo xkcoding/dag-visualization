@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "DAG Visualizer",
+  "version": "1.0.0",
+  "description": "专业的工作流可视化工具 - by 柏玄 with Cursor",
+  "author": "柏玄",
+
+  "action": {
+    "default_title": "打开 DAG Visualizer"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "permissions": [
+    "storage"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png", 
+    "128": "icon128.png"
+  }
+} 

@@ -49,5 +49,3 @@ dag-visualizer-extension/.web-extension-id
 *.temp 
 
 .history/
-
-*.zip
