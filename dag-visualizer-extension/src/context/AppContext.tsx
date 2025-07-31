@@ -229,6 +229,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             )) {
               return false;
             }
+            
+            // 根据includeGrid选项决定是否包含背景网格
+            if (!options.includeGrid && node.classList && (
+              node.classList.contains('react-flow__background') ||
+              node.classList.contains('react-flow__background-pattern')
+            )) {
+              return false;
+            }
+            
             return true;
           },
           // 添加其他选项确保正确捕获

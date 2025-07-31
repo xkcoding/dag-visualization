@@ -66,7 +66,7 @@ export interface ExportOptions {
 }
 
 // 任务节点类型映射
-export type TaskNodeType = 'promptBuild' | 'callLLM' | 'httpRequest' | 'codeExec' | 'default';
+export type TaskNodeType = 'promptBuild' | 'callLLM' | 'httpRequest' | 'codeExec' | 'default'; 
 
 // 图片导出选项类型
 export interface ImageExportOptions {
@@ -76,4 +76,5 @@ export interface ImageExportOptions {
   backgroundColor?: string;
   filename: string;
   quality: number; // 0.1 到 1.0，仅对 JPG 有效
+  includeGrid: boolean; // 是否包含背景网格
 } 

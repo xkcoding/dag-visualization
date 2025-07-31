@@ -1,14 +1,18 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import ReactFlow, { 
   MiniMap, 
   Controls, 
+  ControlButton,
   Background,
+  BackgroundVariant,
   useNodesState,
   useEdgesState,
   MarkerType,
   useReactFlow,
   addEdge,
-  ConnectionLineType
+  ConnectionLineType,
+  ConnectionMode,
+  Position
 } from 'reactflow';
 import type { Node, Edge, Connection } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -16,6 +20,15 @@ import { useApp } from '../context/AppContext';
 import NodeCreationDialog from './NodeCreationDialog';
 import { DEFAULT_NODE_TYPES } from '../utils/nodeTypeManager';
 import type { NodeTypeDefinition } from '../utils/nodeTypeManager';
+import { 
+  calculateSmartLayout, 
+  alignNodesToGrid, 
+  DEFAULT_LAYOUT_OPTIONS, 
+  LAYOUT_DIRECTIONS,
+  findNearestAlignment,
+  DEFAULT_ALIGNMENT_OPTIONS
+} from '../utils/layoutUtils';
+import type { LayoutOptions, AlignmentOptions } from '../utils/layoutUtils';
 
 const DAGVisualizer: React.FC = () => {
   const { state, dispatch, loadDAGData, setReactFlowInstance } = useApp();
@@ -46,6 +59,16 @@ const DAGVisualizer: React.FC = () => {
   // 连线删除提示状态
   const [showDeleteHint, setShowDeleteHint] = useState<boolean>(false);
 
+  // 智能布局状态
+  const [isLayouting, setIsLayouting] = useState<boolean>(false);
+  const [layoutOptions, setLayoutOptions] = useState<LayoutOptions>(DEFAULT_LAYOUT_OPTIONS);
+  
+  // 节点对齐状态
+  const [alignmentOptions, setAlignmentOptions] = useState<AlignmentOptions>(DEFAULT_ALIGNMENT_OPTIONS);
+  
+  // 使用ref来存储智能布局函数，避免依赖循环
+  const smartLayoutRef = useRef<(() => void) | null>(null);
+
   // 当DAG数据变化时更新节点和边
   React.useEffect(() => {
     if (state.dagData) {
@@ -70,7 +93,9 @@ const DAGVisualizer: React.FC = () => {
           minWidth: '180px',
           minHeight: '40px',
           padding: '8px'
-        }
+        },
+        sourcePosition: layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
+        targetPosition: layoutOptions.direction === 'LR' ? Position.Left : Position.Top
       }));
       
       const reactFlowEdges: Edge[] = state.dagData.edges.map(edge => ({
@@ -80,6 +105,8 @@ const DAGVisualizer: React.FC = () => {
         type: 'smoothstep',
         animated: true,
         style: { stroke: '#94a3b8', strokeWidth: 2 },
+        sourcePosition: layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
+        targetPosition: layoutOptions.direction === 'LR' ? Position.Left : Position.Top,
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: '#94a3b8',
@@ -91,7 +118,9 @@ const DAGVisualizer: React.FC = () => {
       setNodes(reactFlowNodes);
       setEdges(reactFlowEdges);
     }
-  }, [state.dagData, setNodes, setEdges]);
+  }, [state.dagData, setNodes, setEdges, layoutOptions.direction]);
+
+
 
   // 更新JSON中的连线信息
   const updateConnectionsInJSON = useCallback(async (connection: Connection) => {
@@ -184,11 +213,27 @@ const DAGVisualizer: React.FC = () => {
 
   // 处理连线
   const onConnect = useCallback((connection: Connection) => {
-    setEdges((eds) => addEdge(connection, eds));
+    const newEdge = {
+      ...connection,
+      id: `${connection.source}-${connection.target}`,
+      type: 'smoothstep',
+      animated: true,
+      style: { stroke: '#94a3b8', strokeWidth: 2 },
+      sourcePosition: layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
+      targetPosition: layoutOptions.direction === 'LR' ? Position.Left : Position.Top,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: '#94a3b8',
+        width: 16,
+        height: 16,
+      }
+    };
+    
+    setEdges((eds) => addEdge(newEdge, eds));
     
     // 更新JSON配置中的dependencies
     updateConnectionsInJSON(connection);
-  }, [setEdges, updateConnectionsInJSON]);
+  }, [setEdges, updateConnectionsInJSON, layoutOptions.direction]);
 
   // 处理节点双击编辑
   const onNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -497,6 +542,107 @@ const DAGVisualizer: React.FC = () => {
     setContextMenuPosition(null);
   }, []);
 
+  // 智能布局处理函数
+  const handleSmartLayout = useCallback(async () => {
+    if (isLayouting || nodes.length === 0) return;
+    
+    setIsLayouting(true);
+    
+    try {
+      // 计算智能布局
+      const layoutedNodes = calculateSmartLayout(nodes, edges, layoutOptions);
+      
+      // 对齐到网格
+      const alignedNodes = alignNodesToGrid(layoutedNodes, 20);
+      
+      // 应用新的节点位置
+      setNodes(alignedNodes);
+      
+      // 布局完成后自动适配视图
+      if (reactFlowInstance && reactFlowInstance.fitView) {
+        setTimeout(() => {
+          reactFlowInstance.fitView({
+            padding: 0.1,
+            includeHiddenNodes: false,
+            duration: 800 // 添加平滑动画
+          });
+        }, 100);
+      }
+      
+      console.log('智能布局完成');
+    } catch (error) {
+      console.error('智能布局失败:', error);
+    } finally {
+      setIsLayouting(false);
+    }
+  }, [isLayouting, nodes, edges, layoutOptions, setNodes, reactFlowInstance]);
+
+  // 将智能布局函数存储到ref中
+  React.useEffect(() => {
+    smartLayoutRef.current = handleSmartLayout;
+  }, [handleSmartLayout]);
+
+
+
+  // 切换布局方向
+  const toggleLayoutDirection = useCallback(() => {
+    if (isLayouting || nodes.length === 0) return;
+    
+    const directions: LayoutOptions['direction'][] = ['TB', 'LR'];
+    const currentIndex = directions.indexOf(layoutOptions.direction);
+    const nextIndex = (currentIndex + 1) % directions.length;
+    const nextDirection = directions[nextIndex];
+    
+    setLayoutOptions(prev => ({
+      ...prev,
+      direction: nextDirection
+    }));
+    
+    console.log(`布局方向切换为: ${LAYOUT_DIRECTIONS[nextDirection].name}`);
+    
+    // 延迟执行智能布局，确保状态更新完成
+    setTimeout(() => {
+      if (smartLayoutRef.current) {
+        smartLayoutRef.current();
+      }
+    }, 100);
+  }, [layoutOptions.direction, isLayouting, nodes.length]);
+
+  // 节点拖动结束处理
+  const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    if (!alignmentOptions.snapToGrid && !alignmentOptions.snapToNodes) return;
+
+    // 获取其他节点
+    const otherNodes = nodes.filter(n => n.id !== node.id);
+    
+    // 查找最近的对齐位置
+    const alignment = findNearestAlignment(node, otherNodes, alignmentOptions);
+    
+    // 如果位置有变化，应用对齐
+    if (alignment.x !== node.position.x || alignment.y !== node.position.y) {
+      const updatedNodes = nodes.map(n => 
+        n.id === node.id 
+          ? { ...n, position: { x: alignment.x, y: alignment.y } }
+          : n
+      );
+      
+      setNodes(updatedNodes);
+      
+      if (alignment.alignedTo) {
+        console.log(`节点 ${node.id} 已对齐到: ${alignment.alignedTo}`);
+      }
+    }
+  }, [nodes, alignmentOptions, setNodes]);
+
+  // 切换对齐选项
+  const toggleSnapToGrid = useCallback(() => {
+    setAlignmentOptions(prev => ({
+      ...prev,
+      snapToGrid: !prev.snapToGrid
+    }));
+    console.log(`网格对齐: ${alignmentOptions.snapToGrid ? '关闭' : '开启'}`);
+  }, [alignmentOptions.snapToGrid]);
+
   // 关闭节点创建对话框
   const closeNodeCreationDialog = useCallback(() => {
     setIsDialogOpen(false);
@@ -522,16 +668,18 @@ const DAGVisualizer: React.FC = () => {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onNodeDragStop={handleNodeDragStop}
           onPaneContextMenu={handlePaneContextMenu}
           onPaneClick={handlePaneClick}
           onNodeDoubleClick={onNodeDoubleClick}
           onConnect={onConnect}
           onEdgesDelete={onEdgesDelete}
           onEdgeClick={onEdgeClick}
-          connectionLineType={ConnectionLineType.SmoothStep}
+          connectionLineType={layoutOptions.direction === 'LR' ? ConnectionLineType.Straight : ConnectionLineType.SmoothStep}
           connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
-          snapToGrid={true}
-          snapGrid={[15, 15]}
+          connectionMode={ConnectionMode.Loose}
+          snapToGrid={alignmentOptions.snapToGrid}
+          snapGrid={[alignmentOptions.gridSize, alignmentOptions.gridSize]}
           deleteKeyCode={['Backspace', 'Delete']}
           multiSelectionKeyCode={'Shift'}
           nodesDraggable={true}
@@ -553,7 +701,37 @@ const DAGVisualizer: React.FC = () => {
             showZoom={true}
             showFitView={true}
             showInteractive={true}
-          />
+          >
+            {/* 智能布局按钮 */}
+            <ControlButton
+              onClick={handleSmartLayout}
+              title={`智能布局 (${LAYOUT_DIRECTIONS[layoutOptions.direction].name})`}
+              disabled={isLayouting || nodes.length === 0}
+            >
+              {isLayouting ? '⟳' : '⊞'}
+            </ControlButton>
+            
+            {/* 布局方向切换按钮 */}
+            <ControlButton
+              onClick={toggleLayoutDirection}
+              title={`布局方向: ${LAYOUT_DIRECTIONS[layoutOptions.direction].name}`}
+              disabled={isLayouting}
+            >
+              {LAYOUT_DIRECTIONS[layoutOptions.direction].icon}
+            </ControlButton>
+            
+            {/* 网格对齐开关按钮 */}
+            <ControlButton
+              onClick={toggleSnapToGrid}
+              title={`网格对齐: ${alignmentOptions.snapToGrid ? '开启' : '关闭'}`}
+              style={{
+                backgroundColor: alignmentOptions.snapToGrid ? '#4CAF50' : undefined,
+                color: alignmentOptions.snapToGrid ? 'white' : undefined
+              }}
+            >
+              {alignmentOptions.snapToGrid ? '⊞' : '⊡'}
+            </ControlButton>
+          </Controls>
           <MiniMap 
             position="bottom-right"
             nodeColor={getNodeColor}
@@ -564,9 +742,11 @@ const DAGVisualizer: React.FC = () => {
             inversePan={false}
           />
           <Background 
-            gap={20}
+            gap={30}
             size={1}
-            color="#e0e0e0"
+            color="#f0f0f0"
+            variant={BackgroundVariant.Lines}
+            style={{ opacity: 0.6 }}
           />
         </ReactFlow>
       </div>
@@ -574,7 +754,7 @@ const DAGVisualizer: React.FC = () => {
       {/* 连线删除提示 */}
       {showDeleteHint && (
         <div className="edge-delete-hint">
-          💡 选中连线后按 Delete 或 Backspace 键删除
+          ℹ 选中连线后按 Delete 或 Backspace 键删除
         </div>
       )}
 

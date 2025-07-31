@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { generateTimestamp } from '../utils/timeUtils';
-
-export interface ExportOptions {
-  format: 'png' | 'jpg' | 'svg';
-  width?: number;
-  height?: number;
-  backgroundColor?: string;
-  filename: string;
-  quality: number; // 0.1 到 1.0，仅对 JPG 有效
-}
+import type { ImageExportOptions } from '../types';
 
 interface ImageExportDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onExport: (options: ExportOptions) => void;
+  onExport: (options: ImageExportOptions) => void;
   isExporting: boolean;
 }
 
@@ -23,13 +15,14 @@ const ImageExportDialog: React.FC<ImageExportDialogProps> = ({
   onExport,
   isExporting
 }) => {
-  const [options, setOptions] = useState<ExportOptions>({
+  const [options, setOptions] = useState<ImageExportOptions>({
     format: 'png',
     width: 1920,
     height: 1080,
     backgroundColor: '#ffffff',
     filename: 'dag-diagram',
-    quality: 0.9
+    quality: 0.9,
+    includeGrid: false
   });
   
 
@@ -236,6 +229,19 @@ const ImageExportDialog: React.FC<ImageExportDialogProps> = ({
               />
               <span className="filename-ext">.{options.format}</span>
             </div>
+          </div>
+
+          {/* 网格导出选项 */}
+          <div className="form-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={options.includeGrid}
+                onChange={(e) => setOptions(prev => ({ ...prev, includeGrid: e.target.checked }))}
+              />
+              🔲 包含背景网格
+            </label>
+            <div className="form-hint">勾选后导出的图片将包含背景网格线</div>
           </div>
         </div>
         

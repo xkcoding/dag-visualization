@@ -101,14 +101,9 @@ const StatusBar: React.FC = () => {
           </div>
         )}
         
-        {state.fileHistory.length > 0 && (
-          <div className="history-indicator" title={`历史记录: ${state.fileHistory.length}项`}>
-            📚 {state.fileHistory.length}
-          </div>
-        )}
+
         
         <div className="app-info">
-          <span className="version-info">DAG 配置快速验证 v1.0</span>
           <span className="author-info">by 柏玄 with Cursor</span>
         </div>
       </div>

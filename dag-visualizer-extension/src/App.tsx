@@ -35,14 +35,14 @@ const AppContent: React.FC = () => {
   }, [state.dagData, state.isLoading]);
 
   return (
-    <div className="app-container">
-      <Toolbar />
-      <JSONInputArea />
-      <ReactFlowProvider>
-        <DAGVisualizer />
-      </ReactFlowProvider>
-      <StatusBar />
-    </div>
+        <div className="app-container">
+          <Toolbar />
+          <JSONInputArea />
+          <ReactFlowProvider>
+            <DAGVisualizer />
+          </ReactFlowProvider>
+          <StatusBar />
+        </div>
   );
 };
 

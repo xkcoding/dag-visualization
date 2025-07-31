@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import ImageExportDialog from './ImageExportDialog';
-import type { ExportOptions } from './ImageExportDialog';
+import type { ImageExportOptions } from '../types';
 
 const Toolbar: React.FC = () => {
   const { loadExampleData, loadLocalFile, exportDAGConfig, exportImage, clearCanvas, state } = useApp();
@@ -39,7 +39,7 @@ const Toolbar: React.FC = () => {
     setIsExportDialogOpen(true);
   };
 
-  const handleImageExport = async (options: ExportOptions) => {
+  const handleImageExport = async (options: ImageExportOptions) => {
     try {
       await exportImage(options);
       setIsExportDialogOpen(false);
