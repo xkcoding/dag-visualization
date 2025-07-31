@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "DAG 配置快速验证",
+  "name": "DAG Visualizer",
   "version": "1.0.0",
-  "description": "专业的DAG工作流可视化和配置验证工具 - by 「柏玄」with Cursor",
-  "author": "DAG Visualization Team",
+  "description": "专业的工作流可视化工具 - by 柏玄 with Cursor",
+  "author": "柏玄",
 
   "action": {
-    "default_title": "打开 DAG 配置快速验证工具"
+    "default_title": "打开 DAG Visualizer"
   },
 
   "background": {

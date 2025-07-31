@@ -95,10 +95,119 @@ export class ColorManager {
     '#64748b', // 灰色
   ];
 
+  // 自定义类型颜色存储
+  private static customTypeColors: Map<string, string> = new Map();
+  
+  // 本地存储键名
+  private static readonly STORAGE_KEY = 'dag-visualizer-colors';
+  
+  // 初始化时从localStorage加载颜色配置
+  static {
+    this.loadColorsFromStorage();
+  }
+
   // 获取节点类型的默认颜色
   static getDefaultColor(nodeType: string): string {
+    // 首先检查是否为预定义类型
     const nodeTypeDefinition = DEFAULT_NODE_TYPES.find(type => type.id === nodeType);
-    return nodeTypeDefinition?.defaultColor || '#64748b';
+    if (nodeTypeDefinition) {
+      return nodeTypeDefinition.defaultColor;
+    }
+    
+    // 检查自定义类型颜色映射
+    if (this.customTypeColors.has(nodeType)) {
+      return this.customTypeColors.get(nodeType)!;
+    }
+    
+    // 返回自定义类型的默认颜色
+    return '#64748b';
+  }
+
+  // 设置自定义类型的默认颜色
+  static setCustomTypeColor(nodeType: string, color: string): void {
+    if (this.isValidHexColor(color)) {
+      this.customTypeColors.set(nodeType, color);
+      this.saveColorsToStorage();
+    }
+  }
+
+  // 获取所有自定义类型颜色
+  static getCustomTypeColors(): Map<string, string> {
+    return new Map(this.customTypeColors);
+  }
+
+  // 批量更新同类型节点颜色
+  static updateTypeDefaultColor(nodeType: string, color: string): void {
+    if (!this.isValidHexColor(color)) return;
+    
+    // 如果是预定义类型，更新DEFAULT_NODE_TYPES中的颜色
+    const nodeTypeIndex = DEFAULT_NODE_TYPES.findIndex(type => type.id === nodeType);
+    if (nodeTypeIndex !== -1) {
+      DEFAULT_NODE_TYPES[nodeTypeIndex].defaultColor = color;
+    } else {
+      // 如果是自定义类型，更新自定义类型颜色映射
+      this.setCustomTypeColor(nodeType, color);
+    }
+    
+    // 保存到localStorage
+    this.saveColorsToStorage();
+  }
+
+  // 从localStorage加载颜色配置
+  private static loadColorsFromStorage(): void {
+    try {
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (stored) {
+        const colorData = JSON.parse(stored);
+        
+        // 恢复预定义类型颜色
+        if (colorData.presetTypes) {
+          Object.entries(colorData.presetTypes as Record<string, string>).forEach(([typeId, color]) => {
+            const nodeTypeIndex = DEFAULT_NODE_TYPES.findIndex(type => type.id === typeId);
+            if (nodeTypeIndex !== -1) {
+              DEFAULT_NODE_TYPES[nodeTypeIndex].defaultColor = color;
+            }
+          });
+        }
+        
+        // 恢复自定义类型颜色
+        if (colorData.customTypes) {
+          this.customTypeColors = new Map(Object.entries(colorData.customTypes));
+        }
+        
+        console.log('✅ 颜色配置从localStorage恢复成功');
+      }
+    } catch (error) {
+      console.warn('⚠️ 加载颜色配置失败:', error);
+    }
+  }
+
+  // 保存颜色配置到localStorage
+  private static saveColorsToStorage(): void {
+    try {
+      const colorData = {
+        presetTypes: Object.fromEntries(
+          DEFAULT_NODE_TYPES.map(type => [type.id, type.defaultColor])
+        ),
+        customTypes: Object.fromEntries(this.customTypeColors)
+      };
+      
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(colorData));
+      console.log('✅ 颜色配置保存到localStorage成功');
+    } catch (error) {
+      console.warn('⚠️ 保存颜色配置失败:', error);
+    }
+  }
+
+  // 清除所有颜色配置
+  static clearStoredColors(): void {
+    localStorage.removeItem(this.STORAGE_KEY);
+    this.customTypeColors.clear();
+    // 恢复默认颜色
+    DEFAULT_NODE_TYPES[0].defaultColor = '#4ade80'; // PROMPT_BUILD
+    DEFAULT_NODE_TYPES[1].defaultColor = '#3b82f6'; // CALL_LLM  
+    DEFAULT_NODE_TYPES[2].defaultColor = '#f59e0b'; // HTTP_REQUEST
+    DEFAULT_NODE_TYPES[3].defaultColor = '#8b5cf6'; // CODE_EXEC
   }
 
   // 生成随机颜色
@@ -168,9 +277,18 @@ export class NodeFactory {
       throw new Error(`未知的节点类型: ${config.nodeType}`);
     }
 
-    // 确定节点颜色
-    const finalColor = config.color || 
-                      ColorManager.getDefaultColor(config.nodeType);
+    // 确定节点颜色 - 修复自定义类型颜色bug
+    let finalColor = config.color;
+    
+    if (!finalColor) {
+      // 如果是自定义类型且有自定义类型定义，使用其默认颜色
+      if (config.customProperties?.isCustomType && nodeTypeDef) {
+        finalColor = nodeTypeDef.defaultColor;
+      } else {
+        // 否则使用ColorManager的默认颜色
+        finalColor = ColorManager.getDefaultColor(config.nodeType);
+      }
+    }
 
     // 生成唯一的taskId（使用用户输入的label作为taskId）
     const taskId = config.label.trim();

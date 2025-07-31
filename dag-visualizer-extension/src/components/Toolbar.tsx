@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import ImageExportDialog from './ImageExportDialog';
+import ConfirmDialog from './ConfirmDialog';
 import type { ImageExportOptions } from '../types';
 
 const Toolbar: React.FC = () => {
   const { loadExampleData, loadLocalFile, exportDAGConfig, exportImage, clearCanvas, state } = useApp();
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [showClearCanvasConfirm, setShowClearCanvasConfirm] = useState(false);
 
   const handleLoadLocalFile = async () => {
     try {
@@ -28,11 +30,16 @@ const Toolbar: React.FC = () => {
   };
 
   const handleClearCanvas = () => {
-    if (state.dagData && window.confirm('确定要清空画布吗？这将删除当前的所有数据。')) {
-      clearCanvas();
-    } else if (!state.dagData) {
+    if (state.dagData) {
+      setShowClearCanvasConfirm(true);
+    } else {
       clearCanvas(); // 如果没有数据就直接清空
     }
+  };
+
+  const confirmClearCanvas = () => {
+    clearCanvas();
+    setShowClearCanvasConfirm(false);
   };
 
   const handleExportImage = () => {
@@ -53,10 +60,18 @@ const Toolbar: React.FC = () => {
     <div className="toolbar">
       <div className="toolbar-left">
         <div className="app-title">
-          <h1>🔗 DAG 配置快速验证</h1>
+          <h1>
+            <span className="app-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <polyline points="3.27,6.96 12,12.01 20.73,6.96" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
+            DAG Visualizer
+          </h1>
           <div className="app-meta">
-            <span className="author">作者：柏玄</span>
-            <span className="tool">开发工具：Cursor</span>
+            <span className="app-subtitle">专业的工作流可视化工具</span>
           </div>
         </div>
       </div>
@@ -128,6 +143,17 @@ const Toolbar: React.FC = () => {
         onClose={() => setIsExportDialogOpen(false)}
         onExport={handleImageExport}
         isExporting={state.isExporting}
+      />
+      
+      <ConfirmDialog
+        isOpen={showClearCanvasConfirm}
+        title="清空画布"
+        message="确定要清空画布吗？这将删除当前的所有节点、连线和可视化数据，且操作不可撤销。"
+        confirmText="清空画布"
+        cancelText="取消"
+        type="danger"
+        onConfirm={confirmClearCanvas}
+        onCancel={() => setShowClearCanvasConfirm(false)}
       />
     </div>
   );

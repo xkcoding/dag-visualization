@@ -4,15 +4,30 @@
       "taskId": "START_NODE",
       "taskType": "START",
       "input": [],
-      "output": [],
+      "output": [
+        {
+          "fieldName": "initData",
+          "path": "$.data"
+        }
+      ],
       "dependencies": []
     },
     {
       "@type": "com.example.workflow.nodes.ProcessNode",
       "taskId": "DATA_PROCESSING",
       "taskType": "PROMPT_BUILD",
-      "input": [],
-      "output": [],
+      "input": [
+        {
+          "fieldName": "rawData",
+          "path": "session.START_NODE.initData"
+        }
+      ],
+      "output": [
+        {
+          "fieldName": "processedData",
+          "path": "$.result"
+        }
+      ],
       "dependencies": [
         "START_NODE"
       ]
@@ -21,8 +36,18 @@
       "@type": "com.example.workflow.nodes.LLMNode",
       "taskId": "AI_ANALYSIS",
       "taskType": "CALL_LLM",
-      "input": [],
-      "output": [],
+      "input": [
+        {
+          "fieldName": "data",
+          "path": "session.DATA_PROCESSING.processedData"
+        }
+      ],
+      "output": [
+        {
+          "fieldName": "analysis",
+          "path": "$.analysis"
+        }
+      ],
       "dependencies": [
         "DATA_PROCESSING"
       ]
@@ -31,21 +56,36 @@
       "@type": "com.example.workflow.nodes.HttpNode",
       "taskId": "API_CALL",
       "taskType": "HttpRequestNode",
-      "input": [],
-      "output": [],
+      "input": [
+        {
+          "fieldName": "payload",
+          "path": "session.AI_ANALYSIS.analysis"
+        }
+      ],
+      "output": [
+        {
+          "fieldName": "response",
+          "path": "$.response"
+        }
+      ],
       "dependencies": [
-        "AI_ANALYSIS",
-        "START_NODE"
+        "AI_ANALYSIS"
       ]
     },
     {
       "@type": "com.example.workflow.nodes.EndNode",
       "taskId": "END_NODE",
       "taskType": "CodeNode",
-      "input": [],
+      "input": [
+        {
+          "fieldName": "finalData",
+          "path": "session.API_CALL.response"
+        }
+      ],
       "output": [],
       "dependencies": [
-        "API_CALL"
+        "API_CALL",
+        "START_NODE"
       ]
     }
   ]

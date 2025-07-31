@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { useApp } from '../context/AppContext';
+import { validateWorkflowData } from '../utils/dagDataProcessor';
+import ConfirmDialog from './ConfirmDialog';
 
 const JSONInputArea: React.FC = () => {
-  const { state, dispatch, loadDAGData } = useApp();
+  const { state, dispatch, loadDAGData, clearCanvas } = useApp();
   const [isValid, setIsValid] = useState(true);
-  const [validationError, setValidationError] = useState('');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const editorRef = useRef<any>(null);
 
   // Monaco Editor配置
@@ -40,7 +42,11 @@ const JSONInputArea: React.FC = () => {
     glyphMargin: false, // 移除左侧glyph边距
     lineDecorationsWidth: 8, // 增加行号和代码之间的间距
     renderLineHighlight: 'line' as const,
+        // 简洁的提示文本，避免格式化问题
+    placeholder: `// 📝 请输入JSON数据或点击上方「加载示例数据」`,
   };
+
+
 
   // 处理文本输入变化
   const handleTextChange = useCallback(async (value: string | undefined) => {
@@ -49,21 +55,33 @@ const JSONInputArea: React.FC = () => {
     
     if (newValue.trim() === '') {
       setIsValid(true);
-      setValidationError('');
+      dispatch({ type: 'SET_ERROR', payload: null });
       return;
     }
     
-    // 实时验证JSON格式
+    // 实时验证JSON格式和工作流数据
     try {
-      JSON.parse(newValue);
-      setIsValid(true);
-      setValidationError('');
+      const parsedData = JSON.parse(newValue);
       
-      // 自动解析和可视化（可选，可设置防抖）
-      await loadDAGData(JSON.parse(newValue));
+      // 验证工作流数据格式
+      const validation = validateWorkflowData(parsedData);
+      if (!validation.isValid) {
+        setIsValid(false);
+        // 将错误信息传递给右侧可视化区域
+        dispatch({ type: 'SET_ERROR', payload: validation.error || 'JSON数据验证失败' });
+        return;
+      }
+      
+      setIsValid(true);
+      dispatch({ type: 'SET_ERROR', payload: null });
+      
+      // 自动解析和可视化
+      await loadDAGData(parsedData);
     } catch (error) {
       setIsValid(false);
-      setValidationError(`JSON格式错误: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMsg = `JSON格式错误: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      // 将错误信息传递给右侧可视化区域
+      dispatch({ type: 'SET_ERROR', payload: errorMsg });
     }
   }, [dispatch, loadDAGData]);
 
@@ -119,7 +137,8 @@ const JSONInputArea: React.FC = () => {
         }
         await handleTextChange(content);
       } catch (error) {
-        setValidationError(`文件读取失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const errorMsg = `文件读取失败: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        dispatch({ type: 'SET_ERROR', payload: errorMsg });
         setIsValid(false);
       }
     }
@@ -139,6 +158,21 @@ const JSONInputArea: React.FC = () => {
     }
   };
 
+  // 清空编辑器
+  const handleClearEditor = () => {
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearEditor = () => {
+    if (editorRef.current) {
+      editorRef.current.setValue('');
+    }
+    // 清空JSON输入和画布数据
+    clearCanvas();
+    setIsValid(true);
+    setShowClearConfirm(false);
+  };
+
   return (
     <div className="json-input-container">
       <div className="input-header">
@@ -155,8 +189,17 @@ const JSONInputArea: React.FC = () => {
             onClick={handleFormatJSON}
             className="format-btn"
             title="格式化JSON"
+            disabled={!state.jsonText.trim()}
           >
             🎨 格式化
+          </button>
+          <button 
+            onClick={handleClearEditor}
+            className="clear-btn"
+            title="清空编辑器"
+            disabled={!state.jsonText.trim()}
+          >
+            🗑️ 清空
           </button>
           <label className="file-input-label" title="选择本地文件">
             📁 文件
@@ -183,20 +226,30 @@ const JSONInputArea: React.FC = () => {
         />
       </div>
       
-      {!isValid && (
-        <div className="error-message">
-          ❌ {validationError}
-        </div>
-      )}
+      {/* 移除左侧错误显示，错误将在右侧可视化区域展示 */}
       
       <div className="input-footer">
-        <div className={`status ${isValid ? 'valid' : 'invalid'}`}>
-          {isValid ? '✅ JSON格式正确' : '❌ JSON格式错误'}
+        <div className={`status ${state.jsonText.trim() === '' ? 'empty' : (isValid ? 'valid' : 'invalid')}`}>
+          {state.jsonText.trim() === '' 
+            ? '📝 请输入JSON数据或点击上方「加载示例数据」' 
+            : (isValid ? '✅ JSON格式正确' : '❌ JSON格式错误')
+          }
         </div>
         <div className="text-stats">
           字符数: {state.jsonText.length} | 行数: {state.jsonText.split('\n').length}
         </div>
       </div>
+      
+      <ConfirmDialog
+        isOpen={showClearConfirm}
+        title="清空JSON输入"
+        message="确定要清空当前的JSON输入内容吗？此操作不可撤销。"
+        confirmText="清空"
+        cancelText="取消"
+        type="danger"
+        onConfirm={confirmClearEditor}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   );
 };

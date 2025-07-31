@@ -4,39 +4,76 @@
 - **操作系统**: macOS (darwin 24.5.0)
 - **Shell**: zsh
 - **开发工具**: Cursor 编辑器
+- **工作目录**: `/Users/yangkai.shen/code/dag_visualization`
 
 ## 🛠️ 现有技术资产
-- dag-question-rewrite-rerank.json (36KB, 1410行) - 真实数据源
-- 技术验证代码：`native-validation/lightweight-dag.html` - 完整功能验证
-- 技术验证代码：`native-validation/real-data-test.html` - 真实数据支持
-- JSON解析器实现：`tech-validation/dag-parser.js` - 可复用组件
+- **测试数据**: `test.json`, `dag-question-rewrite-rerank.json` - DAG工作流配置
+- **Chrome扩展**: `dag-visualizer-extension/` - 完整的ReactFlow应用
+- **核心组件**: DAGVisualizer, JSONInputArea, StatusBar等
+- **布局算法**: `layoutUtils.ts`, `edgeOptimization.ts` - 自定义智能布局
 
-## ✅ 确定的技术栈
-### 📋 核心技术架构（创意阶段确定）
-- **前端技术**：原生 JavaScript (ES6+) + SVG + CSS
-- **部署方式**：油猴脚本 (.user.js)，单文件分发
-- **构建工具**：零构建，直接开发部署
-- **依赖管理**：完全无外部依赖
+## ✅ 实际技术栈 (Phase 2完成)
+### 📋 核心技术架构
+- **前端框架**: React 18 + TypeScript
+- **图形渲染**: ReactFlow v11.x
+- **构建工具**: Vite + TypeScript编译
+- **Chrome扩展**: Manifest V3架构
+- **代码编辑**: Monaco Editor
 
 ### 🎨 UI/UX技术实现
-- **渲染引擎**：SVG原生渲染，4KB核心代码
-- **样式系统**：严格遵循`memory-bank/style-guide.md`规范
-- **布局算法**：分层布局 (Hierarchical Layout)
-- **交互处理**：原生DOM事件，无框架依赖
+- **渲染引擎**: ReactFlow专业图形库
+- **样式系统**: CSS模块化 + 内联样式
+- **布局算法**: 自定义智能布局 + 层级感知
+- **交互处理**: ReactFlow事件系统 + React Hooks
 
 ### 🔄 数据处理技术
-- **JSON解析**：原生JavaScript解析器，支持29节点
-- **配置导出**：简化策略，input/output置空，添加`_visualization`字段
-- **文件操作**：Blob API + FileReader，支持拖拽上传
+- **JSON解析**: `dagDataProcessor.ts` - 支持复杂工作流解析
+- **类型系统**: TypeScript类型定义，完整类型安全
+- **文件操作**: HTML5 File API + JSON导入导出
+- **状态管理**: React Hooks + Context API
+
+## 🧠 智能布局系统 (Phase 2.5)
+### 当前实现特点
+- **层级感知**: 基于拓扑排序的节点层级计算
+- **穿越检测**: 线段相交算法，精确识别连线与节点碰撞
+- **智能绕行**: 动态偏移量计算，强制定位策略
+- **自适应优化**: 简单DAG用基础算法，复杂DAG用增强算法
+
+### 技术评估与优化方向
+#### 当前算法优缺点
+**优势**:
+- ✅ 针对性强，完全定制，效果优良
+- ✅ 用户反馈"完美，符合预期"
+- ✅ 层级感知，保持正常流程直接连线
+
+**挑战**:
+- ⚠️ 代码复杂度较高，维护成本大
+- ⚠️ 算法相对简单，可能不如专业布局库稳定
+
+#### 未来技术选型 (Phase 3+ 考虑)
+**ELKjs迁移评估**:
+- **技术优势**: Eclipse Layout Kernel，业界成熟方案
+- **ReactFlow生态**: 官方推荐，完整集成支持
+- **核心功能**: 内置POLYLINE边路由，自动避免节点穿越
+- **维护收益**: 降低代码复杂度，提升算法稳定性
+
+**迁移策略**:
+1. 保持现有实现稳定运行
+2. Phase 3期间并行测试ELKjs
+3. 效果对比和性能评估
+4. 逐步迁移或保持现状
 
 ## 🔧 技术约束
-- **浏览器兼容性**：Chrome, Firefox, Safari (现代浏览器)
-- **性能要求**：29节点渲染 < 500ms，总文件 < 20KB
-- **安全限制**：油猴脚本权限范围内，无服务器依赖
-- **维护要求**：单文件架构，易于更新和分发
+- **浏览器兼容性**: Chrome Extension环境
+- **性能要求**: 复杂DAG渲染 < 2s，流畅交互
+- **扩展限制**: Chrome Extension权限范围
+- **维护要求**: TypeScript类型安全，模块化架构
 
-## 📚 技术债务
-- 暂无重大技术债务，架构简洁清晰
+## 📚 技术债务管控
+- **当前状态**: 自定义布局算法复杂度较高
+- **风险评估**: 中等风险，功能稳定但维护成本大
+- **缓解策略**: ELKjs评估作为中长期技术演进方向
+- **决策原则**: 保持稳定性优先，技术演进为辅
 
 ---
-*此文件已在创意阶段完成技术栈确定* 
+*技术上下文更新时间: Phase 2.5完成，技术栈确认为React+ReactFlow* 

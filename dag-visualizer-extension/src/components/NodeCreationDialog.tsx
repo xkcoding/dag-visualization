@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   NodeFactory, 
-  DEFAULT_NODE_TYPES 
+  DEFAULT_NODE_TYPES,
+  ColorManager
 } from '../utils/nodeTypeManager';
 import type { 
   NodeCreationConfig
@@ -42,8 +43,12 @@ export const NodeCreationDialog: React.FC<NodeCreationDialogProps> = ({
       if (customNodeType) {
         const randomId = generateRandomNodeId(customNodeType);
         setNodeLabel(randomId);
+        // 使用ColorManager获取自定义类型的默认颜色
+        const customColor = ColorManager.getDefaultColor(customNodeType.trim().toUpperCase());
+        setSelectedColor(customColor);
+      } else {
+        setSelectedColor('#64748b'); // 自定义类型默认颜色
       }
-      setSelectedColor('#64748b'); // 自定义类型默认颜色
     } else {
       setIsCustomType(false);
       const nodeTypeDef = DEFAULT_NODE_TYPES.find(type => type.id === selectedNodeType);
@@ -51,7 +56,8 @@ export const NodeCreationDialog: React.FC<NodeCreationDialogProps> = ({
         // 自动生成一个随机的节点ID
         const randomId = generateRandomNodeId(selectedNodeType);
         setNodeLabel(randomId);
-        setSelectedColor(nodeTypeDef.defaultColor);
+        // 使用ColorManager获取最新的默认颜色
+        setSelectedColor(ColorManager.getDefaultColor(selectedNodeType));
       }
     }
   }, [selectedNodeType, customNodeType]);

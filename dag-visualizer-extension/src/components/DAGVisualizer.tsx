@@ -18,7 +18,7 @@ import type { Node, Edge, Connection } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useApp } from '../context/AppContext';
 import NodeCreationDialog from './NodeCreationDialog';
-import { DEFAULT_NODE_TYPES } from '../utils/nodeTypeManager';
+import { DEFAULT_NODE_TYPES, ColorManager } from '../utils/nodeTypeManager';
 import type { NodeTypeDefinition } from '../utils/nodeTypeManager';
 import { 
   calculateSmartLayout, 
@@ -26,18 +26,23 @@ import {
   DEFAULT_LAYOUT_OPTIONS, 
   LAYOUT_DIRECTIONS,
   findNearestAlignment,
-  DEFAULT_ALIGNMENT_OPTIONS
+  DEFAULT_ALIGNMENT_OPTIONS,
+  detectEdgeCrossings,
+  optimizeLayoutForEdgeCrossings,
+  optimizeComplexDAGLayout,
+  analyzeComplexDAG
 } from '../utils/layoutUtils';
 import type { LayoutOptions, AlignmentOptions } from '../utils/layoutUtils';
 import {
   calculateUniformNodeSize,
   DEFAULT_NODE_TEXT_CONFIG
 } from '../utils/textUtils';
-import {
-  optimizeEdges,
-  DEFAULT_EDGE_OPTIMIZATION_OPTIONS
-} from '../utils/edgeOptimization';
-import type { EdgeOptimizationOptions } from '../utils/edgeOptimization';
+// 移除连线重叠优化相关导入，功能已被智能布局囊括
+// import {
+//   optimizeEdges,
+//   DEFAULT_EDGE_OPTIMIZATION_OPTIONS
+// } from '../utils/edgeOptimization';
+// import type { EdgeOptimizationOptions } from '../utils/edgeOptimization';
 
 const DAGVisualizer: React.FC = () => {
   const { state, dispatch, loadDAGData, setReactFlowInstance } = useApp();
@@ -65,6 +70,9 @@ const DAGVisualizer: React.FC = () => {
   const [editingIsCustomType, setEditingIsCustomType] = useState<boolean>(false);
   const [editingCustomNodeType, setEditingCustomNodeType] = useState<string>('');
   
+  // 批量颜色控制状态
+  const [batchColorMode, setBatchColorMode] = useState<boolean>(false);
+  
   // 连线删除提示状态
   const [showDeleteHint, setShowDeleteHint] = useState<boolean>(false);
 
@@ -82,17 +90,25 @@ const DAGVisualizer: React.FC = () => {
   const [textAdaptiveMode, setTextAdaptiveMode] = useState<'uniform' | 'fixed'>('fixed');
   const textConfig = DEFAULT_NODE_TEXT_CONFIG; // 使用默认配置
 
-  // 连线重叠优化状态
-  const [edgeOptimizationOptions, setEdgeOptimizationOptions] = useState<EdgeOptimizationOptions>(DEFAULT_EDGE_OPTIMIZATION_OPTIONS);
+  // 移除连线重叠优化状态，功能已被智能布局囊括
+  // const [edgeOptimizationOptions, setEdgeOptimizationOptions] = useState<EdgeOptimizationOptions>(DEFAULT_EDGE_OPTIMIZATION_OPTIONS);
 
   // 连线选中和节点高亮状态
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
+  
+  // DAG分析状态
+  const [showAnalysisModal, setShowAnalysisModal] = useState<boolean>(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
 
   // 当DAG数据变化时更新节点和边
   React.useEffect(() => {
     if (state.dagData) {
       const reactFlowNodes: Node[] = state.dagData.nodes.map(node => {
+        // 确保使用正确的颜色，优先使用ColorManager获取最新的默认颜色
+        const nodeTaskType = node.data.taskType || 'default';
+        const nodeColor = node.data.color || ColorManager.getDefaultColor(nodeTaskType);
+        
         return {
           id: node.id,
           type: 'default',
@@ -100,13 +116,16 @@ const DAGVisualizer: React.FC = () => {
           data: { 
             label: node.label,
             original: node.data.original,
-            taskType: node.data.taskType,
+            taskType: nodeTaskType, // 保持一致的数据结构
             inputCount: node.data.inputCount,
-            outputCount: node.data.outputCount
+            outputCount: node.data.outputCount,
+            color: nodeColor, // 添加颜色字段到data中
+            textColor: ColorManager.getContrastTextColor(nodeColor),
+            isCustomType: (node.data as any).isCustomType || false
           },
           style: {
-            backgroundColor: node.data.color || '#ffffff',
-            color: '#ffffff',
+            backgroundColor: nodeColor,
+            color: ColorManager.getContrastTextColor(nodeColor),
             border: '2px solid #ffffff',
             borderRadius: '8px',
             fontSize: '11px', // 默认字体大小，文本模式会单独处理
@@ -152,21 +171,34 @@ const DAGVisualizer: React.FC = () => {
         };
       });
 
-      // 应用连线重叠优化
-      if (edgeOptimizationOptions.enabled && reactFlowNodes.length > 0) {
-        reactFlowEdges = optimizeEdges(
-          reactFlowEdges,
-          reactFlowNodes,
-          layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
-          layoutOptions.direction === 'LR' ? Position.Left : Position.Top,
-          edgeOptimizationOptions
-        );
-      }
+      // 移除连线重叠优化应用，功能已被智能布局囊括
+      // if (edgeOptimizationOptions.enabled && reactFlowNodes.length > 0) {
+      //   reactFlowEdges = optimizeEdges(
+      //     reactFlowEdges,
+      //     reactFlowNodes,
+      //     layoutOptions.direction === 'LR' ? Position.Right : Position.Bottom,
+      //     layoutOptions.direction === 'LR' ? Position.Left : Position.Top,
+      //     edgeOptimizationOptions
+      //   );
+      // }
 
       setNodes(reactFlowNodes);
       setEdges(reactFlowEdges);
+    } else {
+      // 当dagData为null时，清空ReactFlow的节点和边
+      setNodes([]);
+      setEdges([]);
+      
+      // 重置其他相关状态
+      setSelectedEdge(null);
+      setHighlightedNodes(new Set());
+      setEditingNodeId(null);
+      setIsDialogOpen(false);
+      setShowAnalysisModal(false);
+      
+      console.log('✅ 画布已清空：节点和边已移除');
     }
-  }, [state.dagData, setNodes, setEdges, layoutOptions.direction, edgeOptimizationOptions]);
+  }, [state.dagData, setNodes, setEdges, layoutOptions.direction]);
 
   // 使用ref来跟踪上次的textAdaptiveMode，避免无限循环
   const lastTextModeRef = useRef<'uniform' | 'fixed'>('fixed');
@@ -419,6 +451,58 @@ const DAGVisualizer: React.FC = () => {
     }
   }, []);
 
+  // 批量更新同类型节点颜色
+  const updateSameTypeNodesColor = useCallback((nodeType: string, newColor: string) => {
+    let updatedCount = 0;
+    
+    setNodes((currentNodes) => {
+      const updatedNodes = currentNodes.map((node) => {
+        // 安全的类型检查
+        const nodeData = node.data as any;
+        const nodeTaskType = nodeData?.taskType;
+        
+        if (nodeData && nodeTaskType === nodeType) {
+          updatedCount++;
+          
+          const updatedNode = {
+            ...node,
+            data: {
+              ...node.data,
+              color: newColor,
+              textColor: ColorManager.getContrastTextColor(newColor)
+            },
+            style: {
+              ...node.style,
+              backgroundColor: newColor,
+              color: ColorManager.getContrastTextColor(newColor)
+            }
+          };
+          
+          // 节点颜色更新成功
+          
+          return updatedNode;
+        }
+        return node;
+      });
+      
+      console.log(`🎨 批量更新完成: 类型 "${nodeType}", 更新了 ${updatedCount} 个节点`);
+      return updatedNodes;
+    });
+    
+    // 强制ReactFlow重新渲染 - 使用多种方法确保渲染
+    setTimeout(() => {
+      if (reactFlowInstance) {
+        // 方法1: 强制重新适配视图
+        reactFlowInstance.fitView({ duration: 100 });
+        
+        // 方法2: 触发重新计算
+        setTimeout(() => {
+          reactFlowInstance.setNodes((nds) => [...nds]);
+        }, 150);
+      }
+    }, 100);
+  }, [setNodes, reactFlowInstance]);
+
   // 保存节点标签编辑
   const saveNodeLabelEdit = useCallback(async () => {
     if (!editingNodeId || !editingNodeLabel.trim()) {
@@ -472,6 +556,14 @@ const DAGVisualizer: React.FC = () => {
         alert('未知的节点类型');
         return;
       }
+    }
+
+    // 如果是批量颜色模式，更新类型默认颜色并批量应用
+    if (batchColorMode && finalNodeType) {
+      // 更新类型默认颜色
+      ColorManager.updateTypeDefaultColor(finalNodeType, editingNodeColor);
+      // 批量更新所有同类型节点
+      updateSameTypeNodesColor(finalNodeType, editingNodeColor);
     }
 
     // 如果taskId变化，检查新的taskId是否已存在
@@ -554,8 +646,9 @@ const DAGVisualizer: React.FC = () => {
     setEditingNodeColor('');
     setEditingIsCustomType(false);
     setEditingCustomNodeType('');
+    setBatchColorMode(false);
   }, [editingNodeId, editingNodeLabel, editingNodeType, editingNodeColor, editingIsCustomType, 
-      editingCustomNodeType, state.jsonText, dispatch, loadDAGData]);
+      editingCustomNodeType, batchColorMode, updateSameTypeNodesColor, state.jsonText, dispatch, loadDAGData]);
 
   // 取消节点标签编辑
   const cancelNodeLabelEdit = useCallback(() => {
@@ -565,6 +658,7 @@ const DAGVisualizer: React.FC = () => {
     setEditingNodeColor('');
     setEditingIsCustomType(false);
     setEditingCustomNodeType('');
+    setBatchColorMode(false);
   }, []);
 
   // 处理键盘事件
@@ -694,11 +788,52 @@ const DAGVisualizer: React.FC = () => {
     setIsLayouting(true);
     
     try {
-      // 计算智能布局
+      console.log('开始智能布局...');
+      
+      // 计算基础智能布局
       const layoutedNodes = calculateSmartLayout(nodes, edges, layoutOptions);
       
+      // 检测连线穿越问题
+      const crossings = detectEdgeCrossings(layoutedNodes, edges);
+      console.log(`检测到 ${crossings.length} 个连线穿越问题`);
+      
+      // 根据DAG复杂度选择优化策略
+      let optimizedNodes = layoutedNodes;
+      if (crossings.length > 0) {
+        console.log('应用连线穿越优化...', crossings);
+        
+        // 对于复杂DAG (节点数>10 或 穿越数>5) 使用增强算法
+        if (nodes.length > 10 || crossings.length > 5) {
+          console.log('使用复杂DAG优化算法...');
+          optimizedNodes = optimizeComplexDAGLayout(layoutedNodes, edges, layoutOptions);
+          
+          // 输出详细分析结果
+          const analysis = analyzeComplexDAG(optimizedNodes, edges);
+          console.log('复杂DAG优化分析:', analysis);
+          
+          if (analysis.suggestions.length > 0) {
+            console.log('优化建议:', analysis.suggestions.join('; '));
+          }
+        } else {
+          // 简单DAG使用基础算法
+          optimizedNodes = optimizeLayoutForEdgeCrossings(layoutedNodes, edges, layoutOptions);
+        }
+        
+        // 再次检测优化效果
+        const optimizedCrossings = detectEdgeCrossings(optimizedNodes, edges);
+        console.log(`优化后剩余 ${optimizedCrossings.length} 个连线穿越问题`);
+        
+        // 输出穿越问题的详细信息
+        if (optimizedCrossings.length > 0) {
+          const problemEdges = optimizedCrossings.map(c => 
+            `${c.sourceNodeId}→${c.targetNodeId} (${c.severity}, 穿越${c.crossingNodes.length}个节点)`
+          ).join(', ');
+          console.log('剩余穿越问题:', problemEdges);
+        }
+      }
+      
       // 对齐到网格
-      const alignedNodes = alignNodesToGrid(layoutedNodes, 20);
+      const alignedNodes = alignNodesToGrid(optimizedNodes, 20);
       
       // 应用新的节点位置
       setNodes(alignedNodes);
@@ -812,15 +947,15 @@ const DAGVisualizer: React.FC = () => {
     }, 50);
   }, [textAdaptiveMode, layoutOptions.direction]);
 
-  // 切换连线重叠优化
-  const toggleEdgeOptimization = useCallback(() => {
-    setEdgeOptimizationOptions(prev => ({
-      ...prev,
-      enabled: !prev.enabled
-    }));
-    
-    console.log(`连线重叠优化: ${edgeOptimizationOptions.enabled ? '关闭' : '开启'}`);
-  }, [edgeOptimizationOptions.enabled]);
+  // 移除连线重叠优化切换函数，功能已被智能布局囊括
+  // const toggleEdgeOptimization = useCallback(() => {
+  //   setEdgeOptimizationOptions(prev => ({
+  //     ...prev,
+  //     enabled: !prev.enabled
+  //   }));
+  //   
+  //   console.log(`连线重叠优化: ${edgeOptimizationOptions.enabled ? '关闭' : '开启'}`);
+  // }, [edgeOptimizationOptions.enabled]);
 
   // 连线点击事件处理
   const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
@@ -843,6 +978,20 @@ const DAGVisualizer: React.FC = () => {
       setHighlightedNodes(new Set([edge.source, edge.target]));
     }
   }, [selectedEdge, showDeleteHint]);
+  
+  // DAG分析处理函数
+  const handleAnalyzeDAG = useCallback(() => {
+    if (nodes.length === 0) {
+      alert('没有节点数据可供分析');
+      return;
+    }
+    
+    const analysis = analyzeComplexDAG(nodes, edges);
+    setAnalysisResult(analysis);
+    setShowAnalysisModal(true);
+    
+    console.log('DAG分析结果:', analysis);
+  }, [nodes, edges]);
 
   // 关闭节点创建对话框
   const closeNodeCreationDialog = useCallback(() => {
@@ -950,27 +1099,34 @@ const DAGVisualizer: React.FC = () => {
               {textAdaptiveMode === 'fixed' ? 'T' : 'U'}
             </ControlButton>
             
-            {/* 连线重叠优化开关按钮 */}
+            {/* 移除连线重叠优化按钮，功能已被智能布局囊括 */}
+            
+            {/* DAG分析按钮 */}
             <ControlButton
-              onClick={toggleEdgeOptimization}
-              title={`连线重叠优化: ${edgeOptimizationOptions.enabled ? '开启' : '关闭'}`}
-              style={{
-                backgroundColor: edgeOptimizationOptions.enabled ? '#9C27B0' : undefined,
-                color: edgeOptimizationOptions.enabled ? 'white' : undefined
+              onClick={handleAnalyzeDAG}
+              title="分析DAG连线穿越问题"
+              disabled={nodes.length === 0}
+              style={{ 
+                backgroundColor: 'white',
+                color: nodes.length === 0 ? '#9ca3af' : '#374151',
+                cursor: nodes.length === 0 ? 'not-allowed' : 'pointer'
               }}
             >
-              {edgeOptimizationOptions.enabled ? '⧬' : '⧭'}
+              📊
             </ControlButton>
           </Controls>
-          <MiniMap 
-            position="bottom-right"
-            nodeColor={getNodeColor}
-            style={miniMapStyle}
-            ariaLabel="DAG 迷你地图"
-            pannable={true}
-            zoomable={true}
-            inversePan={false}
-          />
+          {/* 只在有数据时显示小地图 */}
+          {state.dagData && (
+            <MiniMap 
+              position="bottom-right"
+              nodeColor={getNodeColor}
+              style={miniMapStyle}
+              ariaLabel="DAG 迷你地图"
+              pannable={true}
+              zoomable={true}
+              inversePan={false}
+            />
+          )}
           <Background 
             gap={30}
             size={1}
@@ -1060,13 +1216,33 @@ const DAGVisualizer: React.FC = () => {
             {/* 颜色选择 */}
             <div className="edit-form-section">
               <label htmlFor="editNodeColor">节点颜色</label>
-              <input
-                id="editNodeColor"
-                type="color"
-                value={editingNodeColor}
-                onChange={(e) => setEditingNodeColor(e.target.value)}
-                className="edit-color-input"
-              />
+              <div className="color-control-wrapper">
+                <input
+                  id="editNodeColor"
+                  type="color"
+                  value={editingNodeColor}
+                  onChange={(e) => setEditingNodeColor(e.target.value)}
+                  className="edit-color-input"
+                />
+                <div className="batch-color-control">
+                  <label className="batch-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={batchColorMode}
+                      onChange={(e) => setBatchColorMode(e.target.checked)}
+                      className="batch-checkbox"
+                    />
+                    <span className="batch-checkbox-text">
+                      批量应用到所有 <strong>{editingIsCustomType ? editingCustomNodeType : (DEFAULT_NODE_TYPES.find(t => t.id === editingNodeType)?.label || editingNodeType)}</strong> 类型节点
+                    </span>
+                  </label>
+                  {batchColorMode && (
+                    <div className="batch-color-info">
+                      <span>🎯 将同时更新该类型的默认颜色</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="node-edit-actions">
@@ -1110,34 +1286,317 @@ const DAGVisualizer: React.FC = () => {
         onCreateNode={handleCreateNode}
       />
       
-      {!state.dagData && !state.isLoading && (
-        <div className="empty-state">
-          <div className="empty-state-icon">📊</div>
-          <h3 className="empty-state-title">DAG 配置快速验证</h3>
-          <p className="empty-state-message">
-            在左侧粘贴JSON工作流数据，或使用工具栏加载文件来开始可视化
-          </p>
-          <div className="empty-state-tips">
-            <p><strong>支持的功能:</strong></p>
-            <ul>
-              <li>包含 taskId 和 dependencies 的工作流节点数组</li>
-              <li>支持多种节点类型：PROMPT_BUILD、CALL_LLM、HttpRequestNode、CodeNode 等</li>
-              <li>自动分层布局和依赖关系可视化</li>
-              <li>🆕 右键创建新节点，支持自定义颜色和类型</li>
-            </ul>
+      {/* DAG分析结果模态框 */}
+      {showAnalysisModal && analysisResult && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowAnalysisModal(false)}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '24px',
+              maxWidth: '32rem',
+              maxHeight: '24rem',
+              overflowY: 'auto',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+              margin: '20px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '16px',
+              borderBottom: '1px solid #e5e7eb',
+              paddingBottom: '12px'
+            }}>
+              <h3 style={{ 
+                fontSize: '18px', 
+                fontWeight: '600', 
+                color: '#111827',
+                margin: 0
+              }}>
+                📊 DAG连线穿越分析报告
+              </h3>
+              <button 
+                onClick={() => setShowAnalysisModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '20px',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '4px'
+                }}
+                onMouseOver={(e) => (e.target as HTMLElement).style.color = '#6b7280'}
+                onMouseOut={(e) => (e.target as HTMLElement).style.color = '#9ca3af'}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* 基础统计 */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '16px', 
+                fontSize: '14px',
+                backgroundColor: '#f9fafb',
+                padding: '12px',
+                borderRadius: '6px'
+              }}>
+                <div>
+                  <span style={{ fontWeight: '500', color: '#374151' }}>节点总数:</span> 
+                  <span style={{ color: '#1f2937', marginLeft: '8px' }}>{analysisResult.totalNodes}</span>
+                </div>
+                <div>
+                  <span style={{ fontWeight: '500', color: '#374151' }}>连线总数:</span> 
+                  <span style={{ color: '#1f2937', marginLeft: '8px' }}>{analysisResult.totalEdges}</span>
+                </div>
+              </div>
+              
+              {/* 严重程度统计 */}
+              <div>
+                <h4 style={{ 
+                  fontWeight: '500', 
+                  color: '#374151', 
+                  marginBottom: '8px',
+                  fontSize: '14px',
+                  margin: '0 0 8px 0'
+                }}>
+                  连线穿越统计
+                </h4>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr 1fr', 
+                  gap: '8px', 
+                  fontSize: '13px' 
+                }}>
+                  <div style={{ 
+                    color: '#dc2626',
+                    padding: '6px 8px',
+                    backgroundColor: '#fef2f2',
+                    borderRadius: '4px',
+                    textAlign: 'center'
+                  }}>
+                    严重: {analysisResult.severitySummary.high}
+                  </div>
+                  <div style={{ 
+                    color: '#d97706',
+                    padding: '6px 8px',
+                    backgroundColor: '#fffbeb',
+                    borderRadius: '4px',
+                    textAlign: 'center'
+                  }}>
+                    中等: {analysisResult.severitySummary.medium}
+                  </div>
+                  <div style={{ 
+                    color: '#16a34a',
+                    padding: '6px 8px',
+                    backgroundColor: '#f0fdf4',
+                    borderRadius: '4px',
+                    textAlign: 'center'
+                  }}>
+                    轻微: {analysisResult.severitySummary.low}
+                  </div>
+                </div>
+              </div>
+              
+              {/* 优化建议 */}
+              {analysisResult.suggestions.length > 0 && (
+                <div>
+                  <h4 style={{ 
+                    fontWeight: '500', 
+                    color: '#374151', 
+                    marginBottom: '8px',
+                    fontSize: '14px',
+                    margin: '0 0 8px 0'
+                  }}>
+                    💡 优化建议
+                  </h4>
+                  <ul style={{ 
+                    fontSize: '13px', 
+                    margin: 0, 
+                    paddingLeft: '16px',
+                    color: '#4b5563'
+                  }}>
+                    {analysisResult.suggestions.map((suggestion: string, index: number) => (
+                      <li key={index} style={{ marginBottom: '4px' }}>
+                        {suggestion}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* 问题连线详情 */}
+              {analysisResult.crossingEdges.length > 0 && (
+                <div>
+                  <h4 style={{ 
+                    fontWeight: '500', 
+                    color: '#374151', 
+                    marginBottom: '8px',
+                    fontSize: '14px',
+                    margin: '0 0 8px 0'
+                  }}>
+                    🔗 问题连线详情 ({analysisResult.crossingEdges.length}条)
+                  </h4>
+                  <div style={{ 
+                    maxHeight: '120px', 
+                    overflowY: 'auto', 
+                    fontSize: '12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '4px',
+                    padding: '8px'
+                  }}>
+                    {analysisResult.crossingEdges.map((crossing: any, index: number) => (
+                      <div key={index} style={{ 
+                        color: '#4b5563', 
+                        marginBottom: '6px',
+                        padding: '4px',
+                        backgroundColor: index % 2 === 0 ? '#f9fafb' : 'transparent',
+                        borderRadius: '2px'
+                      }}>
+                        <span style={{ fontWeight: '500' }}>
+                          {crossing.sourceNodeId} → {crossing.targetNodeId}
+                        </span>
+                        <span style={{
+                          marginLeft: '8px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          backgroundColor: crossing.severity === 'high' ? '#fef2f2' :
+                                         crossing.severity === 'medium' ? '#fffbeb' : '#f0fdf4',
+                          color: crossing.severity === 'high' ? '#dc2626' :
+                                crossing.severity === 'medium' ? '#d97706' : '#16a34a'
+                        }}>
+                          {crossing.severity}
+                        </span>
+                        <span style={{ marginLeft: '4px', color: '#6b7280', fontSize: '11px' }}>
+                          (穿越{crossing.crossingNodes.length}个节点)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setShowAnalysisModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+                onMouseOver={(e) => (e.target as HTMLElement).style.backgroundColor = '#1d4ed8'}
+                onMouseOut={(e) => (e.target as HTMLElement).style.backgroundColor = '#2563eb'}
+              >
+                关闭
+              </button>
+            </div>
           </div>
-          <div className="empty-state-credits">
-            <div className="credits-item">
-              <span className="credits-label">🧑‍💻 作者</span>
-              <span className="credits-value">柏玄</span>
+        </div>
+      )}
+      
+      {!state.dagData && !state.isLoading && !state.error && (
+        <div className="empty-state">
+          <div className="empty-state-container">
+            {/* Header Section */}
+            <div className="empty-state-header">
+              <div className="empty-state-icon">
+                <div className="icon-background">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="3.27,6.96 12,12.01 20.73,6.96" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+              <h1 className="empty-state-title">DAG Visualizer</h1>
+              <p className="empty-state-subtitle">专业的工作流可视化工具</p>
             </div>
-            <div className="credits-item">
-              <span className="credits-label">🛠️ 开发工具</span>
-              <span className="credits-value">Cursor</span>
+
+            {/* Main Content */}
+            <div className="empty-state-content">
+              <div className="content-section">
+                <h3 className="section-title">快速开始</h3>
+                <p className="section-description">
+                  在左侧粘贴JSON工作流数据，或使用工具栏加载文件来开始可视化
+                </p>
+              </div>
+
+              <div className="features-grid">
+                <div className="feature-card">
+                  <div className="feature-icon">🔗</div>
+                  <h4>智能布局</h4>
+                  <p>自动分层布局和依赖关系可视化</p>
+                </div>
+                <div className="feature-card">
+                  <div className="feature-icon">🎨</div>
+                  <h4>自定义节点</h4>
+                  <p>右键创建节点，支持自定义颜色和类型</p>
+                </div>
+                <div className="feature-card">
+                  <div className="feature-icon">⚡</div>
+                  <h4>多格式支持</h4>
+                  <p>支持多种节点类型和数据格式</p>
+                </div>
+              </div>
             </div>
-            <div className="credits-item">
-              <span className="credits-label">⚡ 技术栈</span>
-              <span className="credits-value">React + ReactFlow + TypeScript</span>
+
+            {/* Footer Section */}
+            <div className="empty-state-footer">
+              <div className="footer-content">
+                <div className="author-info">
+                  <div className="author-avatar">柏</div>
+                  <div className="author-details">
+                    <div className="author-name">柏玄</div>
+                    <div className="author-role">Developer</div>
+                  </div>
+                </div>
+                <div className="tech-stack">
+                  <div className="tech-item">
+                    <span className="tech-icon">⚛️</span>
+                    <span>React</span>
+                  </div>
+                  <div className="tech-item">
+                    <span className="tech-icon">🔷</span>
+                    <span>TypeScript</span>
+                  </div>
+                  <div className="tech-item">
+                    <span className="tech-icon">🌊</span>
+                    <span>ReactFlow</span>
+                  </div>
+                </div>
+              </div>
+              <div className="footer-note">
+                <span>使用 </span>
+                <strong>Cursor</strong>
+                <span> 开发</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1146,13 +1605,34 @@ const DAGVisualizer: React.FC = () => {
       {state.error && (
         <div className="error-state">
           <div className="error-state-icon">⚠️</div>
-          <h3 className="error-state-title">数据处理错误</h3>
+          <h3 className="error-state-title">数据验证错误</h3>
           <p className="error-state-message">{state.error}</p>
+          <div className="error-suggestions">
+            <div className="suggestion-item">
+              <span className="suggestion-icon">💡</span>
+              <span>检查JSON格式是否正确</span>
+            </div>
+            <div className="suggestion-item">
+              <span className="suggestion-icon">🔍</span>
+              <span>确保每个节点包含 taskId、taskType、dependencies</span>
+            </div>
+            <div className="suggestion-item">
+              <span className="suggestion-icon">🎯</span>
+              <span>修复左侧JSON输入中的字段缺失问题</span>
+            </div>
+            <div className="suggestion-item">
+              <span className="suggestion-icon">📋</span>
+              <span>可以使用工具栏的"加载示例数据"进行测试</span>
+            </div>
+          </div>
           <button 
             className="error-retry-btn"
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              dispatch({ type: 'SET_ERROR', payload: null });
+              dispatch({ type: 'SET_JSON_TEXT', payload: '' });
+            }}
           >
-            重新加载页面
+            清空重新开始
           </button>
         </div>
       )}

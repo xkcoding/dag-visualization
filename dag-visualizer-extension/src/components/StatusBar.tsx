@@ -104,7 +104,13 @@ const StatusBar: React.FC = () => {
 
         
         <div className="app-info">
-          <span className="author-info">by 柏玄 with Cursor</span>
+          <div className="brand-info">
+            <span className="developer-name">柏玄</span>
+            <span className="separator">•</span>
+            <span className="tech-stack">React + TypeScript</span>
+            <span className="separator">•</span>
+            <span className="dev-tool">Cursor</span>
+          </div>
         </div>
       </div>
     </div>
