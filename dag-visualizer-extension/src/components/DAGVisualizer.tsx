@@ -1567,51 +1567,36 @@ const DAGVisualizer: React.FC = () => {
               </div>
             </div>
 
-            {/* Footer Section */}
+            {/* Footer Section - 紧凑布局 */}
             <div className="empty-state-footer">
-              <div className="footer-content">
+              <div className="footer-compact">
                 <div className="author-info">
                   <div className="author-avatar">柏</div>
-                  <div className="author-details">
-                    <a 
-                      href="https://github.com/xkcoding" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="author-name-link"
-                      title="🔥 Follow @xkcoding 获取更多开源项目"
-                    >
-                      柏玄 Follow→
-                    </a>
-                    <div className="author-role">Developer</div>
-                  </div>
+                  <a 
+                    href="https://github.com/xkcoding" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="author-name-link"
+                    title="🔥 Follow @xkcoding 获取更多开源项目"
+                  >
+                    柏玄
+                  </a>
                 </div>
-                <div className="tech-stack">
-                  <div className="tech-item">
-                    <span className="tech-icon">⚛️</span>
-                    <span>React</span>
-                  </div>
-                  <div className="tech-item">
-                    <span className="tech-icon">🔷</span>
-                    <span>TypeScript</span>
-                  </div>
-                  <div className="tech-item">
-                    <span className="tech-icon">🌊</span>
-                    <span>ReactFlow</span>
-                  </div>
+                <div className="footer-divider">•</div>
+                <div className="tech-compact">
+                  <span>⚛️ React</span>
+                  <span>🔷 TypeScript</span>
+                  <span>🌊 ReactFlow</span>
                 </div>
-              </div>
-              <div className="footer-note">
-                <span>使用 </span>
-                <strong>Cursor</strong>
-                <span> 开发 • </span>
+                <div className="footer-divider">•</div>
                 <a 
                   href="https://github.com/xkcoding/dag-visualization" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="repo-link"
-                  title="⭐ Star 支持项目发展，帮助更多开发者"
+                  className="repo-link-compact"
+                  title="⭐ Star 支持项目发展"
                 >
-                  ⭐ GitHub Star→
+                  ⭐ Star
                 </a>
               </div>
             </div>
