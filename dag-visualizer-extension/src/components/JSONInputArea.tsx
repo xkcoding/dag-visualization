@@ -63,6 +63,8 @@ const JSONInputArea: React.FC = () => {
     if (newValue.trim() === '') {
       setIsValid(true);
       dispatch({ type: 'SET_ERROR', payload: null });
+      // 清空画布数据
+      dispatch({ type: 'SET_DAG_DATA', payload: null });
       return;
     }
     
@@ -74,6 +76,8 @@ const JSONInputArea: React.FC = () => {
       const validation = validateWorkflowData(parsedData);
       if (!validation.isValid) {
         setIsValid(false);
+        // 清空画布数据但保留JSON文本
+        dispatch({ type: 'SET_DAG_DATA', payload: null });
         // 将错误信息传递给右侧可视化区域
         dispatch({ type: 'SET_ERROR', payload: validation.error || 'JSON数据验证失败' });
         return;
@@ -86,6 +90,8 @@ const JSONInputArea: React.FC = () => {
       await loadDAGData(parsedData);
     } catch (error) {
       setIsValid(false);
+      // 清空画布数据但保留JSON文本
+      dispatch({ type: 'SET_DAG_DATA', payload: null });
       const errorMsg = `JSON格式错误: ${error instanceof Error ? error.message : 'Unknown error'}`;
       // 将错误信息传递给右侧可视化区域
       dispatch({ type: 'SET_ERROR', payload: errorMsg });
@@ -144,9 +150,11 @@ const JSONInputArea: React.FC = () => {
         }
         await handleTextChange(content);
       } catch (error) {
+        setIsValid(false);
+        // 清空画布数据但保留JSON文本
+        dispatch({ type: 'SET_DAG_DATA', payload: null });
         const errorMsg = `文件读取失败: ${error instanceof Error ? error.message : 'Unknown error'}`;
         dispatch({ type: 'SET_ERROR', payload: errorMsg });
-        setIsValid(false);
       }
     }
   };

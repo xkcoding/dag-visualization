@@ -7,7 +7,7 @@ import { generateTimestamp } from '../utils/timeUtils';
 
 // 状态操作类型
 type AppAction =
-  | { type: 'SET_DAG_DATA'; payload: DAGData }
+  | { type: 'SET_DAG_DATA'; payload: DAGData | null }
   | { type: 'SET_JSON_TEXT'; payload: string }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
