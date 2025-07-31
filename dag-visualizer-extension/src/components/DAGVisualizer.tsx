@@ -1573,7 +1573,15 @@ const DAGVisualizer: React.FC = () => {
                 <div className="author-info">
                   <div className="author-avatar">柏</div>
                   <div className="author-details">
-                    <div className="author-name">柏玄</div>
+                    <a 
+                      href="https://github.com/xkcoding" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="author-name-link"
+                      title="🔥 Follow @xkcoding 获取更多开源项目"
+                    >
+                      柏玄 Follow→
+                    </a>
                     <div className="author-role">Developer</div>
                   </div>
                 </div>
@@ -1595,7 +1603,16 @@ const DAGVisualizer: React.FC = () => {
               <div className="footer-note">
                 <span>使用 </span>
                 <strong>Cursor</strong>
-                <span> 开发</span>
+                <span> 开发 • </span>
+                <a 
+                  href="https://github.com/xkcoding/dag-visualization" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="repo-link"
+                  title="⭐ Star 支持项目发展，帮助更多开发者"
+                >
+                  ⭐ GitHub Star→
+                </a>
               </div>
             </div>
           </div>

@@ -105,7 +105,25 @@ const StatusBar: React.FC = () => {
         
         <div className="app-info">
           <div className="brand-info">
-            <span className="developer-name">柏玄</span>
+            <a 
+              href="https://github.com/xkcoding" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="developer-link"
+              title="🔥 点击 Follow @xkcoding 获取更多开源项目"
+            >
+              柏玄 (Follow↗)
+            </a>
+            <span className="separator">•</span>
+            <a 
+              href="https://github.com/xkcoding/dag-visualization" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="repo-link"
+              title="⭐ 点击 Star 支持项目发展"
+            >
+              DAG Visualizer (Star↗)
+            </a>
             <span className="separator">•</span>
             <span className="tech-stack">React + TypeScript</span>
             <span className="separator">•</span>

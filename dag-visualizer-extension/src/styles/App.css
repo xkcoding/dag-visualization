@@ -768,6 +768,42 @@
   color: #4a5568;
 }
 
+/* Empty State Links */
+.empty-state .author-name-link,
+.empty-state .repo-link {
+  color: #2d3748;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+}
+
+/* Follow链接 - 紫色渐变效果 */
+.empty-state .author-name-link:hover {
+  color: #ffffff;
+  background: linear-gradient(135deg, #24292e 0%, #6f42c1 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+}
+
+/* Star链接 - 金色渐变效果 */
+.empty-state .repo-link {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6366f1;
+}
+
+.empty-state .repo-link:hover {
+  color: #ffffff;
+  background: linear-gradient(135deg, #f6d55c 0%, #ed8936 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(237, 137, 54, 0.3);
+}
+
+
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .empty-state {
@@ -1157,6 +1193,32 @@
 .dev-tool {
   color: #667eea;
   font-weight: 500;
+}
+
+/* Status Bar Links */
+.status-bar .developer-link,
+.status-bar .repo-link {
+  color: #2d3748;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border-radius: 3px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+
+.status-bar .developer-link:hover {
+  color: #ffffff;
+  background: linear-gradient(135deg, #24292e 0%, #6f42c1 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+}
+
+.status-bar .repo-link:hover {
+  color: #ffffff;
+  background: linear-gradient(135deg, #f6d55c 0%, #ed8936 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(237, 137, 54, 0.3);
 }
 
 .version-info {
